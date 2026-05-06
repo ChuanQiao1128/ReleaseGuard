@@ -292,6 +292,21 @@ Real diff preview is intentionally non-blocking in v0.1.7. A real diff `BLOCK` o
 
 ReleaseGuard Actions preview verified with a docs-only pull request.
 
+## Verified v0.1.8 PR
+
+ReleaseGuard v0.1.8 includes the first GitHub Actions verified PR preview.
+
+- PR: https://github.com/ChuanQiao1128/ReleaseGuardAgents/pull/1
+- Decision: PASS
+- Reason: low-risk docs-only change.
+- Artifacts uploaded: `releaseguard-artifacts`
+
+This PR verifies the GitHub Actions real diff preview path:
+
+```text
+docs-only change -> real diff mode -> Decision: PASS -> artifact uploaded
+```
+
 A later milestone can map real diff decisions to check conclusions, for example `BLOCK` as failure and `WARN` as neutral.
 
 ## Security note
