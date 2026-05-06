@@ -153,9 +153,13 @@ Current demo-corpus benchmark:
 
 ```text
 Memory chunks: 46
-BM25: Recall@5=0.923, MRR=0.346
-Embedding: Recall@5=0.692, MRR=0.310
-RRF hybrid: Recall@5=0.923, MRR=0.390
+Queries: 18
+No-answer queries: 5
+
+BM25: Recall@5=0.923, MRR=0.346, no-answer FPR=0.800
+Embedding: Recall@5=0.692, MRR=0.310, no-answer FPR=1.000
+RRF hybrid: Recall@5=0.923, MRR=0.390, no-answer FPR=1.000
+Guarded RRF hybrid: Recall@5=0.846, MRR=0.364, no-answer FPR=0.000, no-answer abstention=1.000
 ```
 
 BM25 is strong in this repo-memory corpus because many relevant documents
@@ -168,6 +172,22 @@ run in CI without external API keys. It is useful for testing retrieval
 plumbing and evaluation, not a claim that local token hashing matches
 production-grade semantic embeddings. A production embedding provider can be
 added later behind an explicit configuration boundary.
+
+v0.2.2 adds retrieval abstention. Raw embedding and raw RRF retrieval can still
+force context onto no-answer queries, so the guarded retriever can return
+`NO_RELEVANT_CONTEXT` instead of returning unrelated chunks. This matters before
+v0.3 because no-answer handling is required before RAG context can safely
+influence evidence priority.
+
+Try guarded memory search:
+
+```bash
+npm run releaseguard -- memory search --query "How do we handle WebSocket reconnection?"
+# Decision: NO_RELEVANT_CONTEXT
+
+npm run releaseguard -- memory search --query "discount checkout crash"
+# Decision: HAS_RELEVANT_CONTEXT
+```
 
 Generate the discount/checkout repo-memory demo report:
 
@@ -192,10 +212,11 @@ v0.2 supports deterministic local repo-memory retrieval:
 - BM25 baseline retrieval,
 - deterministic local embedding baseline,
 - Reciprocal Rank Fusion hybrid retrieval with `k=60`,
+- guarded RRF retrieval with deterministic abstention,
 - source trust tiers and current-PR document self-immunity hooks,
 - memory chunk citation validation,
 - deterministic retrieval eval dataset generation,
-- benchmark reports with Recall@5, MRR, and no-answer false positive rate,
+- benchmark reports with Recall@5, MRR, no-answer false positive rate, and abstention rate,
 - a discount/checkout demo showing historical ADR and incident context from a noisy local docs corpus.
 
 v0.2 RAG is report-only. It does not affect evidence planning, does not lower evidence requirements, and does not change `PASS` / `WARN` / `BLOCK` decisions. v0.3 may use trusted memory to inform evidence priority, but only with trust safeguards and deterministic decision ownership.

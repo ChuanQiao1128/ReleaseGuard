@@ -88,11 +88,13 @@ export function generateRagEvalDataset(chunks: RepoMemoryChunk[]): RagEvalItem[]
     }));
   }
 
-  items.push(evalItem({
-    query: "WebSocket reconnection backoff policy",
-    goldChunkIds: [],
-    queryType: "no_answer",
-  }));
+  for (const query of noAnswerQueries()) {
+    items.push(evalItem({
+      query,
+      goldChunkIds: [],
+      queryType: "no_answer",
+    }));
+  }
 
   return dedupeByQueryId(items);
 }
@@ -124,6 +126,16 @@ function directQuery(chunk: RepoMemoryChunk): string {
     ? chunk.heading_path.join(" ")
     : chunk.title;
   return `${keywords} ${chunk.source_type}`.trim();
+}
+
+function noAnswerQueries(): string[] {
+  return [
+    "How do we handle WebSocket reconnection?",
+    "What is the Redis cache eviction policy?",
+    "How are payment provider secrets rotated?",
+    "What is the mobile push notification retry policy?",
+    "What is the feature flag rollout strategy?",
+  ];
 }
 
 function findChunk(

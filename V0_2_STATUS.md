@@ -372,3 +372,57 @@ Limitations:
 Next:
 - v0.3 may use trusted RAG context to raise evidence priority, but v0.2.1 stops
   before any RAG-informed evidence planning or merge decision changes.
+
+## v0.2.2 RAG Abstention and No-Answer Guard
+
+Status: Done
+
+Done:
+- Added guarded RRF retrieval with explicit decisions:
+  - `HAS_RELEVANT_CONTEXT`
+  - `LOW_CONFIDENCE_CONTEXT`
+  - `NO_RELEVANT_CONTEXT`
+- Raw BM25, embedding, and RRF APIs remain available for baseline comparison.
+- Expanded deterministic no-answer eval queries from 1 to 5.
+- Added no-answer abstention rate and false abstention rate to benchmark
+  metrics.
+- Added `guarded_rrf_hybrid` to the benchmark.
+- Added `npm run releaseguard -- memory search --query "<query>"`.
+- README now documents retrieval abstention and shows no-answer/search examples.
+
+Tests run:
+- `npm run test --workspace releaseguard -- --run tests/memoryRetrievers.test.ts tests/memoryEvalBenchmark.test.ts`
+- `npm run test --workspace releaseguard`
+- `npm run build --workspace releaseguard`
+- `npm run releaseguard -- memory index`
+- `npm run releaseguard -- memory benchmark`
+- `npm run releaseguard -- memory demo-discount-context`
+- `npm run releaseguard -- memory search --query "How do we handle WebSocket reconnection?"`
+- `npm run releaseguard -- memory search --query "discount checkout crash"`
+- `npm test`
+- `npm run build --workspace @releaseguard/demo-app`
+- `npm run releaseguard:selfcheck`
+- `npm run test --workspace @releaseguard/demo-app`
+
+Benchmark output so far:
+- Chunks: 46
+- Queries: 18
+- No-answer queries: 5
+- BM25: Recall@5 `0.923`, MRR `0.346`, no-answer FPR `0.800`, no-answer abstention `0.200`
+- Embedding: Recall@5 `0.692`, MRR `0.310`, no-answer FPR `1.000`, no-answer abstention `0.000`
+- RRF hybrid: Recall@5 `0.923`, MRR `0.390`, no-answer FPR `1.000`, no-answer abstention `0.000`
+- Guarded RRF hybrid: Recall@5 `0.846`, MRR `0.364`, no-answer FPR `0.000`, no-answer abstention `1.000`
+
+No-answer guard behavior:
+- `How do we handle WebSocket reconnection?` -> `NO_RELEVANT_CONTEXT`
+- `discount checkout crash` -> `HAS_RELEVANT_CONTEXT`
+
+Limitations:
+- Guarded retrieval is conservative and trades some Recall@5 for no-answer
+  safety.
+- v0.2.2 remains report-only and does not affect Evidence Planner or
+  PASS/WARN/BLOCK decisions.
+
+Next:
+- v0.3 may use trusted RAG context to raise evidence priority, but v0.2.2 stops
+  before any RAG-informed evidence planning or merge decision changes.

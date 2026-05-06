@@ -21,6 +21,7 @@ describe("Repo Memory eval, benchmark, and demo reports", () => {
     expect(first.some((item) => item.query_type === "direct")).toBe(true);
     expect(first.some((item) => item.query_type === "near_miss")).toBe(true);
     expect(first.some((item) => item.query_type === "no_answer")).toBe(true);
+    expect(first.filter((item) => item.query_type === "no_answer")).toHaveLength(5);
     for (const item of first.filter((entry) => entry.gold_chunk_ids.length > 0)) {
       for (const chunkId of item.gold_chunk_ids) {
         expect(chunks.some((chunk) => chunk.chunk_id === chunkId)).toBe(true);
@@ -46,17 +47,24 @@ describe("Repo Memory eval, benchmark, and demo reports", () => {
     expect(result.results.map((entry) => entry.retriever).sort()).toEqual([
       "bm25",
       "embedding",
+      "guarded_rrf_hybrid",
       "rrf_hybrid",
     ]);
     expect(result.query_type_counts.direct).toBeGreaterThan(0);
     expect(result.query_type_counts.paraphrase).toBeGreaterThan(0);
     expect(result.query_type_counts.near_miss).toBeGreaterThan(0);
-    expect(result.query_type_counts.no_answer).toBeGreaterThan(0);
+    expect(result.query_type_counts.no_answer).toBeGreaterThanOrEqual(5);
     for (const entry of result.results) {
       expect(entry.metrics).toHaveProperty("recall_at_5");
       expect(entry.metrics).toHaveProperty("mrr");
       expect(entry.metrics).toHaveProperty("no_answer_false_positive_rate");
+      expect(entry.metrics).toHaveProperty("no_answer_abstention_rate");
+      expect(entry.metrics).toHaveProperty("false_abstention_rate");
     }
+    const guarded = result.results.find(
+      (entry) => entry.retriever === "guarded_rrf_hybrid",
+    );
+    expect(guarded?.metrics.no_answer_abstention_rate).toBeGreaterThan(0);
     expect(result.citation_validation_eval).toMatchObject({
       valid_retrieved_citation_passed: true,
       nonexistent_chunk_rejected: true,
@@ -69,10 +77,15 @@ describe("Repo Memory eval, benchmark, and demo reports", () => {
     expect(markdown).toContain("## Dataset");
     expect(markdown).toContain("| Query type | Count |");
     expect(markdown).toContain("## Retriever Comparison");
-    expect(markdown).toContain("No-answer false positive rate");
+    expect(markdown).toContain("No-answer FPR");
+    expect(markdown).toContain("No-answer abstention");
     expect(markdown).toContain("## Interpretation");
     expect(markdown).toContain("BM25 is strong in this repo-memory corpus");
     expect(markdown).toContain("deterministic embedding baseline is local");
+    expect(markdown).toContain("Guarded RRF hybrid adds deterministic abstention");
+    expect(markdown).toContain(
+      "No-answer handling is required before RAG context can safely influence evidence priority",
+    );
     expect(markdown).toContain("Citation Validation Eval");
     expect(markdown).toContain("Limitations");
     expect(markdown).toContain(

@@ -1,6 +1,10 @@
 import { RepoMemoryTrustTier } from "./types";
 
-export type RetrieverName = "bm25" | "embedding" | "rrf_hybrid";
+export type RetrieverName =
+  | "bm25"
+  | "embedding"
+  | "rrf_hybrid"
+  | "guarded_rrf_hybrid";
 
 export type MemoryRetrievalResult = {
   chunk_id: string;

@@ -6,6 +6,7 @@ import { Decision } from "./decision/decisionEngine";
 import { writeRepoMemoryIndex } from "./memory/memoryIndex";
 import { runRagBenchmark } from "./memory/benchmark";
 import { writeRagDemoDiscountContext } from "./memory/demoDiscountContext";
+import { guardedRetrieveWithRrf } from "./memory/guardedRetriever";
 
 export type CliArgs =
   | {
@@ -17,7 +18,8 @@ export type CliArgs =
     }
   | {
       command: "memory";
-      action: "index" | "benchmark" | "demo-discount-context";
+      action: "index" | "benchmark" | "demo-discount-context" | "search";
+      query?: string;
     }
   | { command: "help" };
 
@@ -33,18 +35,33 @@ export function parseCliArgs(argv: string[]): CliArgs {
     if (
       action !== "index" &&
       action !== "benchmark" &&
-      action !== "demo-discount-context"
+      action !== "demo-discount-context" &&
+      action !== "search"
     ) {
       throw new Error(
-        "memory requires one of: index, benchmark, demo-discount-context.",
+        "memory requires one of: index, benchmark, demo-discount-context, search.",
       );
     }
-    if (extra.length > 0) {
-      throw new Error(`Unknown argument: ${extra[0]}`);
+    let query: string | undefined;
+    for (let index = 0; index < extra.length; index += 1) {
+      const arg = extra[index];
+      if (arg === "--query") {
+        query = requireValue(extra, index, "--query");
+        index += 1;
+      } else {
+        throw new Error(`Unknown argument: ${arg}`);
+      }
+    }
+    if (action === "search" && !query) {
+      throw new Error("memory search requires --query.");
+    }
+    if (action !== "search" && query) {
+      throw new Error("--query is only supported with memory search.");
     }
     return {
       command: "memory",
       action,
+      query,
     };
   }
 
@@ -105,15 +122,34 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       console.log(`Memory benchmark items: ${result.dataset_item_count}`);
       for (const benchmark of result.results) {
         console.log(
-          `${benchmark.retriever}: Recall@5=${benchmark.metrics.recall_at_5.toFixed(3)} MRR=${benchmark.metrics.mrr.toFixed(3)}`,
+          `${benchmark.retriever}: Recall@5=${benchmark.metrics.recall_at_5.toFixed(3)} MRR=${benchmark.metrics.mrr.toFixed(3)} no-answer-FPR=${benchmark.metrics.no_answer_false_positive_rate.toFixed(3)} no-answer-abstention=${benchmark.metrics.no_answer_abstention_rate.toFixed(3)}`,
         );
       }
       console.log(`Report: ${relativePath(rootDir, result.markdown_report_path)}`);
       return;
     }
-    const result = await writeRagDemoDiscountContext(rootDir);
-    console.log(`Retrieved chunks: ${result.retrievedChunkIds.length}`);
-    console.log(`Report: ${relativePath(rootDir, result.reportPath)}`);
+    if (args.action === "demo-discount-context") {
+      const result = await writeRagDemoDiscountContext(rootDir);
+      console.log(`Retrieved chunks: ${result.retrievedChunkIds.length}`);
+      console.log(`Report: ${relativePath(rootDir, result.reportPath)}`);
+      return;
+    }
+    const index = await writeRepoMemoryIndex(rootDir);
+    const result = await guardedRetrieveWithRrf({
+      chunks: index.chunks,
+      query: args.query ?? "",
+      limit: 5,
+    });
+    const chunksById = new Map(index.chunks.map((chunk) => [chunk.chunk_id, chunk]));
+    console.log(`Decision: ${result.decision}`);
+    console.log(`Reason: ${result.reason}`);
+    console.log(`Retrieved chunks: ${result.results.length}`);
+    for (const item of result.results) {
+      const chunk = chunksById.get(item.chunk_id);
+      console.log(
+        `- ${item.rank}. ${chunk?.title ?? item.chunk_id} (${chunk?.file_path ?? "unknown"})`,
+      );
+    }
     return;
   }
 
@@ -197,6 +233,7 @@ function usage(): string {
     "  releaseguard memory index",
     "  releaseguard memory benchmark",
     "  releaseguard memory demo-discount-context",
+    '  releaseguard memory search --query "discount checkout crash"',
   ].join("\n");
 }
 

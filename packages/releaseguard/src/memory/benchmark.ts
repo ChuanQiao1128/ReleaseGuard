@@ -8,13 +8,18 @@ import {
   RagEvalQueryType,
   writeRagEvalDataset,
 } from "./evalDataset";
+import { guardedRetrieveWithRrf, RetrievalDecision } from "./guardedRetriever";
 import { writeRepoMemoryIndex } from "./memoryIndex";
 import { validateRepoMemoryCitation } from "./memoryCitationValidator";
 import { MemoryRetrievalResult } from "./retrieverTypes";
 import { fuseWithRrf } from "./rrfRetriever";
 import { RepoMemoryChunk } from "./types";
 
-export type RetrieverBenchmarkName = "bm25" | "embedding" | "rrf_hybrid";
+export type RetrieverBenchmarkName =
+  | "bm25"
+  | "embedding"
+  | "rrf_hybrid"
+  | "guarded_rrf_hybrid";
 
 export type RetrieverMetrics = {
   recall_at_5: number;
@@ -22,6 +27,8 @@ export type RetrieverMetrics = {
   answerable_query_count: number;
   no_answer_query_count: number;
   no_answer_false_positive_rate: number;
+  no_answer_abstention_rate: number;
+  false_abstention_rate: number;
 };
 
 export type RetrieverBenchmarkResult = {
@@ -51,6 +58,7 @@ export type CitationValidationEval = {
 type RetrieverRun = {
   name: RetrieverBenchmarkName;
   resultsByQueryId: Map<string, MemoryRetrievalResult[]>;
+  decisionsByQueryId?: Map<string, RetrievalDecision>;
 };
 
 export async function runRagBenchmark(
@@ -61,7 +69,11 @@ export async function runRagBenchmark(
   const runs = await runRetrievers(index.chunks, dataset.items);
   const results = runs.map((run) => ({
     retriever: run.name,
-    metrics: computeMetrics(dataset.items, run.resultsByQueryId),
+    metrics: computeMetrics(
+      dataset.items,
+      run.resultsByQueryId,
+      run.decisionsByQueryId,
+    ),
   }));
 
   const reportsDir = path.join(rootDir, ".releaseguard", "reports");
@@ -174,6 +186,8 @@ async function runRetrievers(
   const bm25 = new Map<string, MemoryRetrievalResult[]>();
   const embedding = new Map<string, MemoryRetrievalResult[]>();
   const hybrid = new Map<string, MemoryRetrievalResult[]>();
+  const guarded = new Map<string, MemoryRetrievalResult[]>();
+  const guardedDecisions = new Map<string, RetrievalDecision>();
 
   for (const item of items) {
     const bm25Results = retrieveWithBm25({
@@ -196,18 +210,31 @@ async function runRetrievers(
         limit: 5,
       }),
     );
+    const guardedResult = await guardedRetrieveWithRrf({
+      chunks,
+      query: item.query,
+      limit: 5,
+    });
+    guarded.set(item.query_id, guardedResult.results);
+    guardedDecisions.set(item.query_id, guardedResult.decision);
   }
 
   return [
     { name: "bm25", resultsByQueryId: bm25 },
     { name: "embedding", resultsByQueryId: embedding },
     { name: "rrf_hybrid", resultsByQueryId: hybrid },
+    {
+      name: "guarded_rrf_hybrid",
+      resultsByQueryId: guarded,
+      decisionsByQueryId: guardedDecisions,
+    },
   ];
 }
 
 export function computeMetrics(
   items: RagEvalItem[],
   resultsByQueryId: Map<string, MemoryRetrievalResult[]>,
+  decisionsByQueryId?: Map<string, RetrievalDecision>,
 ): RetrieverMetrics {
   const answerable = items.filter((item) => item.gold_chunk_ids.length > 0);
   const noAnswer = items.filter((item) => item.gold_chunk_ids.length === 0);
@@ -216,6 +243,10 @@ export function computeMetrics(
 
   for (const item of answerable) {
     const results = resultsByQueryId.get(item.query_id) ?? [];
+    const abstained = didAbstain(item.query_id, results, decisionsByQueryId);
+    if (abstained) {
+      continue;
+    }
     const firstGoldIndex = results.findIndex((result) =>
       item.gold_chunk_ids.includes(result.chunk_id),
     );
@@ -226,10 +257,22 @@ export function computeMetrics(
   }
 
   let falsePositive = 0;
+  let noAnswerAbstained = 0;
   for (const item of noAnswer) {
     const results = resultsByQueryId.get(item.query_id) ?? [];
-    if (results.some((result) => result.score > 0)) {
+    const abstained = didAbstain(item.query_id, results, decisionsByQueryId);
+    if (abstained) {
+      noAnswerAbstained += 1;
+    } else if (results.some((result) => result.score > 0)) {
       falsePositive += 1;
+    }
+  }
+
+  let answerableAbstained = 0;
+  for (const item of answerable) {
+    const results = resultsByQueryId.get(item.query_id) ?? [];
+    if (didAbstain(item.query_id, results, decisionsByQueryId)) {
+      answerableAbstained += 1;
     }
   }
 
@@ -240,6 +283,10 @@ export function computeMetrics(
     no_answer_query_count: noAnswer.length,
     no_answer_false_positive_rate:
       noAnswer.length === 0 ? 0 : falsePositive / noAnswer.length,
+    no_answer_abstention_rate:
+      noAnswer.length === 0 ? 0 : noAnswerAbstained / noAnswer.length,
+    false_abstention_rate:
+      answerable.length === 0 ? 0 : answerableAbstained / answerable.length,
   };
 }
 
@@ -251,6 +298,7 @@ function benchmarkLimitations(
     "This is a small demo-corpus benchmark, not a production retrieval benchmark.",
     "v0.2 benchmark uses deterministic local template queries, not a reviewed production eval set.",
     "Embedding baseline defaults to deterministic local token hashing unless an external provider is explicitly configured later.",
+    "No-answer handling is required before RAG context can safely influence evidence priority.",
     "RAG retrieval is report context only in v0.2 and does not change PASS/WARN/BLOCK decisions.",
   ];
   if (dataset.items.length < 20 || chunks.length < 30) {
@@ -282,11 +330,11 @@ function renderBenchmarkMarkdown(report: RagBenchmarkRun, rootDir: string): stri
     "",
     "## Retriever Comparison",
     "",
-    "| Retriever | Recall@5 | MRR | No-answer false positive rate | Answerable queries | No-answer queries |",
-    "|---|---:|---:|---:|---:|---:|",
+    "| Retriever | Recall@5 | MRR | No-answer FPR | No-answer abstention | False abstention | Answerable queries | No-answer queries |",
+    "|---|---:|---:|---:|---:|---:|---:|---:|",
     ...report.results.map(
       (result) =>
-        `| ${result.retriever} | ${formatMetric(result.metrics.recall_at_5)} | ${formatMetric(result.metrics.mrr)} | ${formatMetric(result.metrics.no_answer_false_positive_rate)} | ${result.metrics.answerable_query_count} | ${result.metrics.no_answer_query_count} |`,
+        `| ${result.retriever} | ${formatMetric(result.metrics.recall_at_5)} | ${formatMetric(result.metrics.mrr)} | ${formatMetric(result.metrics.no_answer_false_positive_rate)} | ${formatMetric(result.metrics.no_answer_abstention_rate)} | ${formatMetric(result.metrics.false_abstention_rate)} | ${result.metrics.answerable_query_count} | ${result.metrics.no_answer_query_count} |`,
     ),
     "",
     "## Interpretation",
@@ -296,6 +344,10 @@ function renderBenchmarkMarkdown(report: RagBenchmarkRun, rootDir: string): stri
     "The deterministic embedding baseline is local and CI-safe. It validates retrieval plumbing and evaluation without external API keys, but it is not a claim that token hashing matches production-grade semantic embeddings.",
     "",
     "RRF hybrid retrieval does not assume embedding-only retrieval is superior. It uses reciprocal ranks from BM25 and embedding results and can improve ordering quality even when Recall@5 is unchanged.",
+    "",
+    "Guarded RRF hybrid adds deterministic abstention. It can return NO_RELEVANT_CONTEXT for no-answer queries instead of forcing unrelated chunks into report context.",
+    "",
+    "No-answer handling is required before RAG context can safely influence evidence priority.",
     "",
     "## Citation Validation Eval",
     "",
@@ -311,6 +363,18 @@ function renderBenchmarkMarkdown(report: RagBenchmarkRun, rootDir: string): stri
     ...report.limitations.map((limitation) => `- ${limitation}`),
     "",
   ].join("\n");
+}
+
+function didAbstain(
+  queryId: string,
+  results: MemoryRetrievalResult[],
+  decisionsByQueryId: Map<string, RetrievalDecision> | undefined,
+): boolean {
+  const decision = decisionsByQueryId?.get(queryId);
+  if (decision) {
+    return decision === "NO_RELEVANT_CONTEXT";
+  }
+  return results.length === 0 || !results.some((result) => result.score > 0);
 }
 
 function queryTypeCounts(

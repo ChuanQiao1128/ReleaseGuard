@@ -6,6 +6,7 @@ import {
   cosineSimilarity,
 } from "../src/memory/embeddingProvider";
 import { retrieveWithEmbeddings } from "../src/memory/embeddingRetriever";
+import { guardedRetrieveWithRrf } from "../src/memory/guardedRetriever";
 import { fuseWithRrf, RRF_K } from "../src/memory/rrfRetriever";
 import { applyTemporalDecay } from "../src/memory/temporalDecay";
 import { writeRepoMemoryIndex } from "../src/memory/memoryIndex";
@@ -168,6 +169,53 @@ describe("Repo Memory retrievers", () => {
     );
     expect(applyTemporalDecay(1, adr)).toBe(1);
     expect(applyTemporalDecay(1, noDate)).toBe(1);
+  });
+
+  it("guarded retrieval abstains on no-answer queries", async () => {
+    const { chunks } = await writeRepoMemoryIndex(repoRoot);
+
+    const result = await guardedRetrieveWithRrf({
+      chunks,
+      query: "How do we handle WebSocket reconnection?",
+    });
+
+    expect(result).toMatchObject({
+      decision: "NO_RELEVANT_CONTEXT",
+      retriever: "guarded_rrf_hybrid",
+    });
+    expect(result.results).toEqual([]);
+  });
+
+  it("guarded retrieval returns discount and checkout context", async () => {
+    const { chunks } = await writeRepoMemoryIndex(repoRoot);
+
+    const result = await guardedRetrieveWithRrf({
+      chunks,
+      query: "discount checkout crash",
+      limit: 5,
+    });
+    const paths = result.results
+      .map((item) => chunks.find((chunk) => chunk.chunk_id === item.chunk_id))
+      .map((chunk) => chunk?.file_path ?? "");
+
+    expect(result.decision).toBe("HAS_RELEVANT_CONTEXT");
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/discount-crash|checkout-critical-flow/),
+      ]),
+    );
+  });
+
+  it("guarded retrieval handles an empty corpus", async () => {
+    await expect(
+      guardedRetrieveWithRrf({
+        chunks: [],
+        query: "discount checkout crash",
+      }),
+    ).resolves.toMatchObject({
+      decision: "NO_RELEVANT_CONTEXT",
+      results: [],
+    });
   });
 });
 

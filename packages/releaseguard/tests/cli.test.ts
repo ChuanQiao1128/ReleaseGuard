@@ -63,9 +63,25 @@ describe("parseCliArgs", () => {
     });
   });
 
+  it("parses memory search arguments", () => {
+    expect(
+      parseCliArgs(["memory", "search", "--query", "discount checkout"]),
+    ).toEqual({
+      command: "memory",
+      action: "search",
+      query: "discount checkout",
+    });
+  });
+
   it("rejects memory without index", () => {
     expect(() => parseCliArgs(["memory"])).toThrow(
-      "memory requires one of: index, benchmark, demo-discount-context.",
+      "memory requires one of: index, benchmark, demo-discount-context, search.",
+    );
+  });
+
+  it("rejects memory search without a query", () => {
+    expect(() => parseCliArgs(["memory", "search"])).toThrow(
+      "memory search requires --query.",
     );
   });
 
