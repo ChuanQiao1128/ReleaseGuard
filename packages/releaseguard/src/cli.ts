@@ -4,6 +4,8 @@ import { existsSync } from "node:fs";
 import { runReleaseGuard } from "./run";
 import { Decision } from "./decision/decisionEngine";
 import { writeRepoMemoryIndex } from "./memory/memoryIndex";
+import { runRagBenchmark } from "./memory/benchmark";
+import { writeRagDemoDiscountContext } from "./memory/demoDiscountContext";
 
 export type CliArgs =
   | {
@@ -15,7 +17,7 @@ export type CliArgs =
     }
   | {
       command: "memory";
-      action: "index";
+      action: "index" | "benchmark" | "demo-discount-context";
     }
   | { command: "help" };
 
@@ -28,15 +30,21 @@ export function parseCliArgs(argv: string[]): CliArgs {
   }
   if (command === "memory") {
     const [action, ...extra] = rest;
-    if (action !== "index") {
-      throw new Error("memory requires the index subcommand.");
+    if (
+      action !== "index" &&
+      action !== "benchmark" &&
+      action !== "demo-discount-context"
+    ) {
+      throw new Error(
+        "memory requires one of: index, benchmark, demo-discount-context.",
+      );
     }
     if (extra.length > 0) {
       throw new Error(`Unknown argument: ${extra[0]}`);
     }
     return {
       command: "memory",
-      action: "index",
+      action,
     };
   }
 
@@ -81,13 +89,31 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
 
   const rootDir = resolveRootDir();
   if (args.command === "memory") {
-    const result = await writeRepoMemoryIndex(rootDir);
-    const outputPath = path
-      .relative(rootDir, result.outputPath)
-      .split(path.sep)
-      .join("/");
-    console.log(`Memory chunks: ${result.chunks.length}`);
-    console.log(`Output: ${outputPath}`);
+    if (args.action === "index") {
+      const result = await writeRepoMemoryIndex(rootDir);
+      const outputPath = path
+        .relative(rootDir, result.outputPath)
+        .split(path.sep)
+        .join("/");
+      console.log(`Memory chunks: ${result.chunks.length}`);
+      console.log(`Output: ${outputPath}`);
+      return;
+    }
+    if (args.action === "benchmark") {
+      const result = await runRagBenchmark(rootDir);
+      console.log(`Memory benchmark chunks: ${result.index_chunk_count}`);
+      console.log(`Memory benchmark items: ${result.dataset_item_count}`);
+      for (const benchmark of result.results) {
+        console.log(
+          `${benchmark.retriever}: Recall@5=${benchmark.metrics.recall_at_5.toFixed(3)} MRR=${benchmark.metrics.mrr.toFixed(3)}`,
+        );
+      }
+      console.log(`Report: ${relativePath(rootDir, result.markdown_report_path)}`);
+      return;
+    }
+    const result = await writeRagDemoDiscountContext(rootDir);
+    console.log(`Retrieved chunks: ${result.retrievedChunkIds.length}`);
+    console.log(`Report: ${relativePath(rootDir, result.reportPath)}`);
     return;
   }
 
@@ -107,6 +133,10 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   console.log(`Report: ${report}`);
 
   assertExpectedDecision(result.decision.decision, args.expectDecision);
+}
+
+function relativePath(rootDir: string, filePath: string): string {
+  return path.relative(rootDir, filePath).split(path.sep).join("/");
 }
 
 function resolveRootDir(): string {
@@ -165,6 +195,8 @@ function usage(): string {
     "  releaseguard run --fixture demo-docs-only",
     "  releaseguard run --fixture demo-docs-only --expect-decision PASS",
     "  releaseguard memory index",
+    "  releaseguard memory benchmark",
+    "  releaseguard memory demo-discount-context",
   ].join("\n");
 }
 

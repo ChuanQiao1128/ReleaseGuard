@@ -49,9 +49,23 @@ describe("parseCliArgs", () => {
     });
   });
 
+  it("parses memory benchmark arguments", () => {
+    expect(parseCliArgs(["memory", "benchmark"])).toEqual({
+      command: "memory",
+      action: "benchmark",
+    });
+  });
+
+  it("parses memory discount context demo arguments", () => {
+    expect(parseCliArgs(["memory", "demo-discount-context"])).toEqual({
+      command: "memory",
+      action: "demo-discount-context",
+    });
+  });
+
   it("rejects memory without index", () => {
     expect(() => parseCliArgs(["memory"])).toThrow(
-      "memory requires the index subcommand.",
+      "memory requires one of: index, benchmark, demo-discount-context.",
     );
   });
 

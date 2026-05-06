@@ -73,7 +73,7 @@ async function listMarkdownFiles(dir: string): Promise<string[]> {
       continue;
     }
 
-    if (entry.isFile() && /\.md$/i.test(entry.name)) {
+    if (entry.isFile() && /\.md$/i.test(entry.name) && !/^rag_/i.test(entry.name)) {
       files.push(absolutePath);
     }
   }

@@ -34,7 +34,9 @@ describe("repo memory loader and chunker", () => {
         text: "# Overview\n\nReleaseGuard connects PR impact to evidence.",
         related_capability_ids: [],
         related_file_paths: [],
-        tagging_status: "untagged",
+        tagging_status: "unresolved",
+        tagging_confidence: "unresolved",
+        trust_tier: "context_only",
       }),
     ]);
   });

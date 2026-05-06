@@ -5,6 +5,7 @@ import {
   REPO_MEMORY_INDEX_VERSION,
   RepoMemoryChunk,
   RepoMemorySourceType,
+  RepoMemoryTrustTier,
 } from "./types";
 
 type Heading = {
@@ -39,7 +40,12 @@ export function chunkMarkdownFile(args: {
       heading_path: section.headingPath,
       related_capability_ids: [],
       related_file_paths: [],
-      tagging_status: "untagged",
+      tagging_status: "unresolved",
+      tagging_confidence: "unresolved",
+      tagging_basis: "not_tagged_yet",
+      trust_tier: trustTierForSourceType(args.sourceType),
+      trusted_for_current_run: true,
+      created_at: createdAtFromPath(args.filePath),
       index_version: REPO_MEMORY_INDEX_VERSION,
     }));
 }
@@ -134,4 +140,24 @@ function memoryChunkId(args: {
     .digest("hex")
     .slice(0, 16);
   return `mem_${hash}`;
+}
+
+function trustTierForSourceType(
+  sourceType: RepoMemorySourceType,
+): RepoMemoryTrustTier {
+  if (sourceType === "adr") {
+    return "trusted_for_decision_context";
+  }
+  if (sourceType === "doc") {
+    return "context_only";
+  }
+  return "retrieval_only";
+}
+
+function createdAtFromPath(filePath: string): string | undefined {
+  const match = /(?:^|\/)(\d{4})-(\d{2})(?:-\d{2})?/.exec(filePath);
+  if (!match) {
+    return undefined;
+  }
+  return `${match[1]}-${match[2]}-01T00:00:00.000Z`;
 }

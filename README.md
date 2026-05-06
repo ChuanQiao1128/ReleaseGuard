@@ -103,7 +103,7 @@ It does not support:
 - Monorepos beyond this local npm workspace demo.
 - Endpoint constants, template literals, axios wrappers, tRPC, GraphQL, generated clients, OpenAPI clients, and dynamic URLs.
 
-## v0.2 Preview: Repo Memory
+## v0.2 Repo Memory RAG
 
 v0.1 uses the Capability Graph for structured code dependencies:
 
@@ -118,7 +118,13 @@ v0.2 begins Repo Memory RAG for unstructured repository knowledge:
 - incidents,
 - previous ReleaseGuard reports.
 
-The first v0.2 task only loads and chunks local markdown memory sources:
+The v0.2 principle is:
+
+```text
+Graph for structured dependencies. RAG for unstructured repo memory.
+```
+
+Build the local repo memory index:
 
 ```bash
 npm run releaseguard -- memory index
@@ -130,11 +136,46 @@ This writes:
 .releaseguard/memory_chunks.json
 ```
 
-TASK-RAG-001 does not retrieve, rank, generate embeddings, call an LLM, or affect evidence planning. The v0.2 principle is:
+Run the v0.2 retrieval benchmark:
+
+```bash
+npm run releaseguard -- memory benchmark
+```
+
+This writes:
 
 ```text
-Graph for structured dependencies. RAG for unstructured repo memory.
+.releaseguard/reports/rag_benchmark_v0_2.md
+.releaseguard/reports/rag_benchmark_v0_2.json
 ```
+
+Generate the discount/checkout repo-memory demo report:
+
+```bash
+npm run releaseguard -- memory demo-discount-context
+```
+
+This writes:
+
+```text
+.releaseguard/reports/rag_demo_discount_context.md
+```
+
+v0.2 supports deterministic local repo-memory retrieval:
+
+- capability tagging for chunks using graph-backed file paths and conservative keywords,
+- BM25 baseline retrieval,
+- deterministic local embedding baseline,
+- Reciprocal Rank Fusion hybrid retrieval with `k=60`,
+- source trust tiers and current-PR document self-immunity hooks,
+- memory chunk citation validation,
+- deterministic retrieval eval dataset generation,
+- benchmark reports with Recall@5, MRR, and no-answer false positive rate,
+- a discount/checkout demo showing historical ADR and incident context from a noisy local docs corpus.
+
+v0.2 RAG is report-only. It does not affect evidence planning, does not lower evidence requirements, and does not change `PASS` / `WARN` / `BLOCK` decisions. v0.3 may use trusted memory to inform evidence priority, but only with trust safeguards and deterministic decision ownership.
+
+v0.2 does not support pgvector, live GitHub issue/PR sync, reranking, arbitrary CI log ingestion, PR comments, GitHub App/OAuth, generated tests, Playwright browser flows, OpenAPI diff, or dashboards.
 
 ## Day 1 demo app
 
