@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ChangeScope } from "../src/diff/diffParser";
 import { analyzeScope } from "../src/diff/scopeAnalyzer";
+import { applyDemoDiscountRegressionFixture } from "../src/fixtures/regressionFixture";
 import { runReleaseGuardWithScope } from "../src/run";
 
 const repoRoot = path.resolve(process.cwd(), "../..");
@@ -47,6 +48,37 @@ describe("real diff mode pipeline", () => {
       decision: "PASS",
       reason: "required selected evidence passed.",
     });
+  });
+
+  it("blocks real diff discount API changes when selected evidence fails", async () => {
+    const fixture = await applyDemoDiscountRegressionFixture(repoRoot);
+    try {
+      const result = await runReleaseGuardWithScope({
+        rootDir: repoRoot,
+        scope: makeGitScope(["apps/demo-app/src/app/api/discount/apply/route.ts"]),
+      });
+      const report = await fs.readFile(result.reportPath, "utf8");
+
+      expect(result.impact.affected_capability_ids).toEqual(
+        expect.arrayContaining(["api_apply_discount", "route_checkout"]),
+      );
+      expect(result.evidencePlan.selectedEvidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            capabilityId: "api_apply_discount",
+            testFile: "tests/api/discount.test.ts",
+          }),
+        ]),
+      );
+      expect(result.decision).toEqual({
+        decision: "BLOCK",
+        reason: "selected high-priority evidence failed.",
+      });
+      expect(report).toContain("Decision: BLOCK");
+      expect(report).toContain("tests/api/discount.test.ts");
+    } finally {
+      await fixture.restore();
+    }
   });
 
   it("warns when source changes cannot be mapped to a known capability", async () => {

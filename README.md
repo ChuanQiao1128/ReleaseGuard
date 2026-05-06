@@ -33,6 +33,17 @@ npm run releaseguard -- run --base main --head HEAD
 npm run releaseguard -- run --base origin/main --head HEAD
 ```
 
+Run the real diff regression demo on a temporary branch:
+
+```bash
+git checkout -b demo-real-diff-discount-regression
+cp packages/releaseguard/fixtures/demo-discount-regression/route.ts apps/demo-app/src/app/api/discount/apply/route.ts
+git add apps/demo-app/src/app/api/discount/apply/route.ts
+git commit -m "demo: introduce discount regression"
+npm run releaseguard -- run --base main --head HEAD
+# Decision: BLOCK
+```
+
 `demo-discount-regression` expected output:
 
 ```text
@@ -193,7 +204,59 @@ Expected v0.1.5 behavior:
 - `apps/demo-app/src/app/api/discount/apply/route.ts` maps to `api_apply_discount`, traverses to `route_checkout`, and selects `tests/api/discount.test.ts`.
 - unmapped source changes return `WARN` with `source change could not be mapped to known capability.`
 
-Real diff mode requires a git repository and valid refs. If git is unavailable or refs are invalid, use the fixture commands for the demo path. GitHub Actions still runs fixture self-checks first; real PR workflow enforcement is not part of v0.1.5.
+Real diff mode requires a git repository and valid refs. If git is unavailable or refs are invalid, use the fixture commands for the demo path. GitHub Actions still runs fixture self-checks first; real PR workflow enforcement is not part of v0.1.6.
+
+## Real Diff Demo
+
+This demo uses a real git branch and real `git diff` output. It does not use `--fixture`.
+
+Start from a clean `main` branch:
+
+```bash
+git checkout main
+git pull --ff-only origin main
+git checkout -b demo-real-diff-discount-regression
+```
+
+Apply the demo regression to the branch:
+
+```bash
+cp packages/releaseguard/fixtures/demo-discount-regression/route.ts apps/demo-app/src/app/api/discount/apply/route.ts
+git add apps/demo-app/src/app/api/discount/apply/route.ts
+git commit -m "demo: introduce discount regression"
+```
+
+Run ReleaseGuard in real diff mode:
+
+```bash
+npm run releaseguard -- run --base main --head HEAD
+```
+
+Expected output:
+
+```text
+Decision: BLOCK
+Reason: selected high-priority evidence failed.
+Report: artifacts/releaseguard/<run_id>/report.md
+```
+
+What happens:
+
+- `git diff` reports `apps/demo-app/src/app/api/discount/apply/route.ts`.
+- The scanner maps that file to `api_apply_discount`.
+- Graph traversal marks `route_checkout` affected because it consumes the API.
+- Evidence planning selects `tests/api/discount.test.ts`.
+- The selected invalid-discount test fails because the branch returns HTTP 500.
+- The deterministic decision engine returns `BLOCK`.
+
+Clean up after the demo:
+
+```bash
+git checkout main
+git branch -D demo-real-diff-discount-regression
+```
+
+If ReleaseGuard sees a source file change that cannot be mapped to a known capability, it fails safe with `WARN` instead of `PASS`.
 
 ## Run In CI
 

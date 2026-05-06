@@ -281,4 +281,31 @@ Issues:
 - None currently.
 
 Next:
-- Tag `releaseguard-v0.1.5` and push the branch/tag.
+- `v0.1.5-real-diff-mode` was tagged as `releaseguard-v0.1.5`, pushed, and fast-forward merged to `main`.
+- Continue with v0.1.6 real diff demo branch documentation and validation.
+
+## v0.1.6 Real Diff Demo Branch
+
+Status: Done
+
+Done:
+- Fast-forward merged `v0.1.5-real-diff-mode` into `main` and pushed `main`.
+- Created branch `v0.1.6-real-diff-demo`.
+- Added README instructions for a real `demo-real-diff-discount-regression` branch using `--base main --head HEAD`.
+- Added a real diff pipeline test proving a changed demo discount API file maps to `api_apply_discount`, traverses to `route_checkout`, selects `tests/api/discount.test.ts`, and returns `BLOCK` when selected evidence fails.
+- Validated the README branch flow locally with a temporary `demo-real-diff-discount-regression-validation` branch; real diff mode returned `Decision: BLOCK`, then the temporary branch was deleted.
+
+Tests run:
+- `npm run test --workspace releaseguard`
+- `npm run build --workspace releaseguard`
+- `npm test`
+- `npm run build --workspace @releaseguard/demo-app`
+- `npm run releaseguard:selfcheck`
+- `npm run test --workspace @releaseguard/demo-app`
+- `npm run releaseguard -- run --base main --head HEAD` on a temporary real regression branch
+
+Issues:
+- None currently.
+
+Next:
+- Commit, tag `releaseguard-v0.1.6`, and push the branch/tag.
