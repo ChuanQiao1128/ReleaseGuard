@@ -6,7 +6,7 @@ const execFileAsync = promisify(execFile);
 export type ChangeScope =
   | {
       mode: "fixture";
-      fixture: "demo-discount-regression";
+      fixture: "demo-discount-regression" | "demo-missing-evidence";
       changedFiles: string[];
       docsOnly: false;
     }
@@ -25,12 +25,15 @@ export async function resolveChangeScope(args: {
   fixture?: string;
 }): Promise<ChangeScope> {
   if (args.fixture) {
-    if (args.fixture !== "demo-discount-regression") {
+    if (
+      args.fixture !== "demo-discount-regression" &&
+      args.fixture !== "demo-missing-evidence"
+    ) {
       throw new Error(`Unknown fixture: ${args.fixture}`);
     }
     return {
       mode: "fixture",
-      fixture: "demo-discount-regression",
+      fixture: args.fixture,
       changedFiles: ["apps/demo-app/src/app/api/discount/apply/route.ts"],
       docsOnly: false,
     };
@@ -66,4 +69,3 @@ export function isDocsOnlyPath(filePath: string): boolean {
     filePath.startsWith("docs/")
   );
 }
-

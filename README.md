@@ -10,9 +10,13 @@ Run the v0.1 demo:
 
 ```bash
 npm run releaseguard -- run --fixture demo-discount-regression
+# Decision: BLOCK
+
+npm run releaseguard -- run --fixture demo-missing-evidence
+# Decision: WARN
 ```
 
-Expected output:
+`demo-discount-regression` expected output:
 
 ```text
 Decision: BLOCK
@@ -21,6 +25,16 @@ Report: artifacts/releaseguard/<run_id>/report.md
 ```
 
 The demo fixture simulates a PR where the discount API regresses invalid codes from HTTP 400 to HTTP 500. ReleaseGuard scans the repo, sees that `/checkout` consumes `POST /api/discount/apply`, selects the existing invalid-discount API test, runs it, and blocks the merge when the selected evidence fails.
+
+`demo-missing-evidence` expected output:
+
+```text
+Decision: WARN
+Reason: high-risk capability has missing required evidence.
+Report: artifacts/releaseguard/<run_id>/report.md
+```
+
+That fixture simulates a high-risk discount API change where only valid-discount evidence exists. ReleaseGuard still identifies `api_apply_discount` and `route_checkout`, but it cannot find required `invalid_discount` evidence, so it warns instead of pretending the change is covered.
 
 ## v0.1 support
 
@@ -38,6 +52,7 @@ It supports:
 - Selected test execution.
 - Deterministic `PASS` / `WARN` / `BLOCK` decisions.
 - Markdown reports under `artifacts/releaseguard/<run_id>/report.md`.
+- Fixture demos for `BLOCK` and `WARN`.
 
 It does not support:
 
@@ -73,7 +88,7 @@ npm test
 
 ## Run ReleaseGuard v0.1
 
-This environment does not have a git repository, so the regression path is provided as a fixture:
+The regression path is provided as a fixture:
 
 ```bash
 npm run releaseguard -- run --fixture demo-discount-regression
@@ -88,6 +103,22 @@ Report: artifacts/releaseguard/<run_id>/report.md
 ```
 
 The fixture temporarily applies a bug where invalid discount codes return HTTP 500 instead of HTTP 400, runs the selected existing API test, writes the report, and restores the normal route file.
+
+Run the missing-evidence fixture:
+
+```bash
+npm run releaseguard -- run --fixture demo-missing-evidence
+```
+
+Expected output:
+
+```text
+Decision: WARN
+Reason: high-risk capability has missing required evidence.
+Report: artifacts/releaseguard/<run_id>/report.md
+```
+
+The fixture temporarily scans a valid-only discount API test file. No selected test satisfies the required `invalid_discount`, `400`, and `error_status` evidence, so the deterministic decision engine returns `WARN`.
 
 Scanner artifacts are written to:
 

@@ -2,6 +2,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { decide } from "../src/decision/decisionEngine";
 import { planEvidence } from "../src/evidence/evidencePlanner";
+import { EvidencePlan } from "../src/evidence/types";
 import { EvidenceExecutionResult } from "../src/executor/selectedTestExecutor";
 import { renderMarkdownReport } from "../src/report/markdownReport";
 import { scanRepository } from "../src/scanner/repoScanner";
@@ -43,6 +44,46 @@ describe("decision engine and markdown report", () => {
       reason: "selected high-priority evidence failed.",
     });
   });
+
+  it("returns WARN when high-risk required evidence is missing", async () => {
+    const { graph } = await scanRepository(repoRoot);
+    const evidencePlan: EvidencePlan = {
+      requirements: [],
+      selectedEvidence: [],
+      missingEvidence: [
+        {
+          requirementId: "req_api_apply_discount_invalid_discount",
+          capabilityId: "api_apply_discount",
+          reason:
+            "No direct API test had invalid_discount, 400, and error_status tags.",
+          requiredTags: ["invalid_discount", "400", "error_status"],
+        },
+      ],
+    };
+    const executionResult: EvidenceExecutionResult = {
+      results: [],
+      artifactPath: path.join(
+        repoRoot,
+        "artifacts/releaseguard/test/evidence_result.json",
+      ),
+      testResultsPath: path.join(
+        repoRoot,
+        "artifacts/releaseguard/test/test_results.json",
+      ),
+    };
+
+    expect(
+      decide({
+        graph,
+        evidencePlan,
+        executionResult,
+      }),
+    ).toEqual({
+      decision: "WARN",
+      reason: "high-risk capability has missing required evidence.",
+    });
+  });
+
 
   it("renders the BLOCK report golden output", async () => {
     const { graph, result } = await scanRepository(repoRoot);

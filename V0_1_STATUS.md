@@ -161,3 +161,30 @@ Next:
 - Tag `releaseguard-v0.1` created.
 - Remote `origin` set to `git@github.com:ChuanQiao1128/ReleaseGuardAgents.git`.
 - Push was not run.
+
+## v0.1.2 Missing Evidence Demo
+
+Status: Done
+
+Done:
+- Created branch `v0.1.2-missing-evidence`.
+- Added `demo-missing-evidence` fixture support.
+- The fixture temporarily scans a valid-only discount API test file so `invalid_discount` evidence is genuinely absent from the capability graph.
+- Evidence Planner records missing `invalid_discount`, `400`, and `error_status` evidence for high-risk `api_apply_discount`.
+- Decision Engine returns `WARN` through the existing high-risk missing-evidence rule.
+- Added tests for missing evidence fixture output, fixture restoration, WARN decision path, and missing evidence report content.
+- Updated README with BLOCK and WARN demo commands.
+- Set ReleaseGuard package tests to run fixture-mutating test files serially to avoid source-file fixture races.
+
+Tests run:
+- `npm run test --workspace releaseguard` initially failed because fixture-mutating tests ran in parallel and temporarily changed the shared demo test file.
+- `npm run test --workspace releaseguard` passed after disabling package test file parallelism.
+- `npm run test --workspace releaseguard && npm run build --workspace releaseguard && npm test && npm run build --workspace @releaseguard/demo-app && npm run releaseguard -- run --fixture demo-discount-regression && npm run releaseguard -- run --fixture demo-missing-evidence && npm run test --workspace @releaseguard/demo-app`
+
+Issues:
+- None currently.
+- Latest BLOCK fixture report: `artifacts/releaseguard/20260506T123542Z/report.md`.
+- Latest WARN fixture report: `artifacts/releaseguard/20260506T123544Z/report.md`.
+
+Next:
+- Commit, tag `releaseguard-v0.1.2`, and push the branch/tag.

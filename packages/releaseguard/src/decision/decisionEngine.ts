@@ -33,7 +33,7 @@ export function decide(input: {
   ) {
     return {
       decision: "WARN",
-      reason: "high-risk capability is missing required evidence.",
+      reason: "high-risk capability has missing required evidence.",
     };
   }
 
@@ -61,4 +61,3 @@ export function decide(input: {
     reason: "required selected evidence passed.",
   };
 }
-

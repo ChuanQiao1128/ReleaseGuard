@@ -11,7 +11,10 @@ import {
   executeSelectedTests,
   EvidenceExecutionResult,
 } from "./executor/selectedTestExecutor";
-import { applyDemoDiscountRegressionFixture } from "./fixtures/regressionFixture";
+import {
+  applyDemoDiscountRegressionFixture,
+  applyDemoMissingEvidenceFixture,
+} from "./fixtures/regressionFixture";
 import { CapabilityGraph } from "./graph/types";
 import { renderMarkdownReport } from "./report/markdownReport";
 import { scanRepository } from "./scanner/repoScanner";
@@ -48,80 +51,89 @@ export async function runReleaseGuard(
     fixture: options.fixture,
   });
 
-  const { graph, result: scannerResult } = await scanRepository(rootDir);
-  const agent = new DeterministicChangeImpactAgent();
-  const agentOutput = await agent.analyze({
-    changedFiles: scope.changedFiles,
-    graph,
-  });
-  const validation = validateChangeImpactOutput(graph, agentOutput);
-  const impact: ChangeImpactAgentOutput = validation.valid
-    ? validation.output
-    : {
-        affected_capability_ids: [],
-        rationale_per_capability: {},
-        citations: [],
-        unresolved_items: validation.errors.map((error) => ({
-          item: "change_impact_agent_output",
-          reason: error,
-        })),
-      };
-
-  const evidencePlan = planEvidence({
-    graph,
-    affectedCapabilityIds: impact.affected_capability_ids,
-  });
-
-  let executionResult: EvidenceExecutionResult;
-  let fixtureRestore: { restore(): Promise<void> } | undefined;
+  let preScanFixtureRestore: { restore(): Promise<void> } | undefined;
   try {
-    if (scope.mode === "fixture" && scope.fixture === "demo-discount-regression") {
-      fixtureRestore = await applyDemoDiscountRegressionFixture(rootDir);
+    if (scope.mode === "fixture" && scope.fixture === "demo-missing-evidence") {
+      preScanFixtureRestore = await applyDemoMissingEvidenceFixture(rootDir);
     }
-    executionResult = await executeSelectedTests({
-      rootDir,
-      artifactDir,
-      selectedEvidence: evidencePlan.selectedEvidence,
-    });
-  } finally {
-    await fixtureRestore?.restore();
-  }
 
-  const decision = decide({
-    graph,
-    evidencePlan,
-    executionResult,
-    docsOnly: scope.docsOnly,
-    infrastructureFailed:
-      !validation.valid ||
-      (impact.affected_capability_ids.length === 0 && !scope.docsOnly),
-  });
-
-  const reportPath = path.join(artifactDir, "report.md");
-  await fs.writeFile(
-    reportPath,
-    renderMarkdownReport({
+    const { graph, result: scannerResult } = await scanRepository(rootDir);
+    const agent = new DeterministicChangeImpactAgent();
+    const agentOutput = await agent.analyze({
+      changedFiles: scope.changedFiles,
       graph,
-      scope,
+    });
+    const validation = validateChangeImpactOutput(graph, agentOutput);
+    const impact: ChangeImpactAgentOutput = validation.valid
+      ? validation.output
+      : {
+          affected_capability_ids: [],
+          rationale_per_capability: {},
+          citations: [],
+          unresolved_items: validation.errors.map((error) => ({
+            item: "change_impact_agent_output",
+            reason: error,
+          })),
+        };
+
+    const evidencePlan = planEvidence({
+      graph,
+      affectedCapabilityIds: impact.affected_capability_ids,
+    });
+
+    let executionResult: EvidenceExecutionResult;
+    let executionFixtureRestore: { restore(): Promise<void> } | undefined;
+    try {
+      if (scope.mode === "fixture" && scope.fixture === "demo-discount-regression") {
+        executionFixtureRestore = await applyDemoDiscountRegressionFixture(rootDir);
+      }
+      executionResult = await executeSelectedTests({
+        rootDir,
+        artifactDir,
+        selectedEvidence: evidencePlan.selectedEvidence,
+      });
+    } finally {
+      await executionFixtureRestore?.restore();
+    }
+
+    const decision = decide({
+      graph,
+      evidencePlan,
+      executionResult,
+      docsOnly: scope.docsOnly,
+      infrastructureFailed:
+        !validation.valid ||
+        (impact.affected_capability_ids.length === 0 && !scope.docsOnly),
+    });
+
+    const reportPath = path.join(artifactDir, "report.md");
+    await fs.writeFile(
+      reportPath,
+      renderMarkdownReport({
+        graph,
+        scope,
+        impact,
+        evidencePlan,
+        executionResult,
+        decision,
+        graphPath: scannerResult.graphPath,
+        coveragePath: scannerResult.coveragePath,
+        artifactDir,
+      }),
+    );
+
+    return {
+      decision,
+      reportPath,
+      artifactDir,
+      graph,
       impact,
       evidencePlan,
       executionResult,
-      decision,
-      graphPath: scannerResult.graphPath,
-      coveragePath: scannerResult.coveragePath,
-      artifactDir,
-    }),
-  );
-
-  return {
-    decision,
-    reportPath,
-    artifactDir,
-    graph,
-    impact,
-    evidencePlan,
-    executionResult,
-  };
+    };
+  } finally {
+    await preScanFixtureRestore?.restore();
+  }
 }
 
 function createRunId(): string {
