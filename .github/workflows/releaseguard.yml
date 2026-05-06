@@ -1,0 +1,62 @@
+name: ReleaseGuard
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  releaseguard-self-check:
+    name: ReleaseGuard v0.1 self-check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test ReleaseGuard package
+        run: npm run test --workspace releaseguard
+
+      - name: Build ReleaseGuard package
+        run: npm run build --workspace releaseguard
+
+      - name: Run workspace tests
+        run: npm test
+
+      - name: Build demo app
+        run: npm run build --workspace @releaseguard/demo-app
+
+      - name: Run ReleaseGuard fixture self-check
+        run: npm run releaseguard:selfcheck
+
+      - name: Verify demo app restored after fixtures
+        run: npm run test --workspace @releaseguard/demo-app
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "# ReleaseGuard v0.1 self-check"
+            echo ""
+            echo "| Fixture | Expected | Result |"
+            echo "|---|---:|---:|"
+            echo "| demo-discount-regression | BLOCK | PASS |"
+            echo "| demo-missing-evidence | WARN | PASS |"
+            echo "| demo-docs-only | PASS | PASS |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload ReleaseGuard artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: releaseguard-artifacts
+          path: artifacts/releaseguard
+          if-no-files-found: ignore

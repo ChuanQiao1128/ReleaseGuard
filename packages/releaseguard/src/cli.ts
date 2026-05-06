@@ -2,6 +2,7 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
 import { runReleaseGuard } from "./run";
+import { Decision } from "./decision/decisionEngine";
 
 export type CliArgs =
   | {
@@ -9,8 +10,11 @@ export type CliArgs =
       base?: string;
       head?: string;
       fixture?: string;
+      expectDecision?: Decision;
     }
   | { command: "help" };
+
+const VALID_DECISIONS = new Set<Decision>(["PASS", "WARN", "BLOCK"]);
 
 export function parseCliArgs(argv: string[]): CliArgs {
   const [command, ...rest] = argv;
@@ -32,6 +36,11 @@ export function parseCliArgs(argv: string[]): CliArgs {
       index += 1;
     } else if (arg === "--fixture") {
       parsed.fixture = requireValue(rest, index, "--fixture");
+      index += 1;
+    } else if (arg === "--expect-decision") {
+      parsed.expectDecision = parseExpectedDecision(
+        requireValue(rest, index, "--expect-decision"),
+      );
       index += 1;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
@@ -66,6 +75,8 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   console.log(`Decision: ${result.decision.decision}`);
   console.log(`Reason: ${result.decision.reason}`);
   console.log(`Report: ${report}`);
+
+  assertExpectedDecision(result.decision.decision, args.expectDecision);
 }
 
 function resolveRootDir(): string {
@@ -93,6 +104,28 @@ function requireValue(args: string[], index: number, flag: string): string {
   return value;
 }
 
+function parseExpectedDecision(value: string): Decision {
+  if (!VALID_DECISIONS.has(value as Decision)) {
+    throw new Error(
+      `--expect-decision must be one of PASS, WARN, or BLOCK. Received: ${value}`,
+    );
+  }
+  return value as Decision;
+}
+
+export function assertExpectedDecision(
+  actual: Decision,
+  expected: Decision | undefined,
+): void {
+  if (!expected) {
+    return;
+  }
+  if (actual !== expected) {
+    throw new Error(`Expected decision ${expected}, received ${actual}.`);
+  }
+  console.log(`Expected decision matched: ${expected}`);
+}
+
 function usage(): string {
   return [
     "Usage:",
@@ -100,6 +133,7 @@ function usage(): string {
     "  releaseguard run --fixture demo-discount-regression",
     "  releaseguard run --fixture demo-missing-evidence",
     "  releaseguard run --fixture demo-docs-only",
+    "  releaseguard run --fixture demo-docs-only --expect-decision PASS",
   ].join("\n");
 }
 

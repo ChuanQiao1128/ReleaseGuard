@@ -216,3 +216,36 @@ Issues:
 
 Next:
 - Commit, tag `releaseguard-v0.1.3`, and push the branch/tag.
+
+## v0.1.4 GitHub Actions Self-check
+
+Status: Done
+
+Done:
+- Fast-forward merged `v0.1.3-docs-only` into `main` and pushed `main`.
+- Created branch `v0.1.4-github-actions`.
+- Added CLI `--expect-decision` support.
+- Added root `npm run releaseguard:selfcheck` script for the three fixture checks:
+  - `demo-discount-regression` -> `BLOCK`
+  - `demo-missing-evidence` -> `WARN`
+  - `demo-docs-only` -> `PASS`
+- Added `.github/workflows/releaseguard.yml` for PR and manual fixture self-checks.
+- Workflow installs dependencies, tests, builds, runs self-check, verifies fixture restore, uploads `artifacts/releaseguard`, and writes a job summary.
+- Updated README with CI self-check notes.
+- Updated run IDs to include milliseconds so fast self-check fixture runs do not overwrite artifact directories.
+
+Tests run:
+- `npm run test --workspace releaseguard`
+- `npm run build --workspace releaseguard`
+- `npm run releaseguard:selfcheck`
+- `if npm run releaseguard -- run --fixture demo-docs-only --expect-decision BLOCK; then echo unexpected-pass; exit 1; else echo expected-failure; fi`
+- `npm run test --workspace releaseguard && npm run build --workspace releaseguard && npm test && npm run build --workspace @releaseguard/demo-app && npm run releaseguard -- run --fixture demo-discount-regression && npm run releaseguard -- run --fixture demo-missing-evidence && npm run releaseguard -- run --fixture demo-docs-only && npm run releaseguard:selfcheck && npm run test --workspace @releaseguard/demo-app`
+
+Issues:
+- None currently.
+- Latest BLOCK fixture report: `artifacts/releaseguard/20260506T125811498Z/report.md`.
+- Latest WARN fixture report: `artifacts/releaseguard/20260506T125812518Z/report.md`.
+- Latest PASS fixture report: `artifacts/releaseguard/20260506T125812894Z/report.md`.
+
+Next:
+- Commit, tag `releaseguard-v0.1.4`, and push the branch/tag.

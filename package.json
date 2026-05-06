@@ -8,6 +8,7 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "releaseguard": "npm run cli --workspace releaseguard --",
+    "releaseguard:selfcheck": "npm run releaseguard -- run --fixture demo-discount-regression --expect-decision BLOCK && npm run releaseguard -- run --fixture demo-missing-evidence --expect-decision WARN && npm run releaseguard -- run --fixture demo-docs-only --expect-decision PASS",
     "test": "npm run test --workspaces"
   }
 }

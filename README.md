@@ -19,6 +19,12 @@ npm run releaseguard -- run --fixture demo-docs-only
 # Decision: PASS
 ```
 
+Run all fixture checks:
+
+```bash
+npm run releaseguard:selfcheck
+```
+
 `demo-discount-regression` expected output:
 
 ```text
@@ -153,6 +159,14 @@ Scanner artifacts are written to:
 
 - `.releaseguard/capability_graph.json`
 - `.releaseguard/coverage_report.md`
+
+## Run In CI
+
+ReleaseGuard v0.1.4 includes a minimal GitHub Actions self-check workflow at `.github/workflows/releaseguard.yml`.
+
+The workflow runs on `pull_request` and `workflow_dispatch`. It installs dependencies, builds and tests the workspace, runs all three fixture checks, uploads `artifacts/releaseguard`, and writes a job summary.
+
+This is a fixture self-check, not the real PR diff gate yet. A later milestone will add real PR diff mode or GitHub check integration.
 
 ## Security note
 

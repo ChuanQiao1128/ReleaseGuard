@@ -176,7 +176,7 @@ function createRunId(): string {
   return new Date()
     .toISOString()
     .replace(/[-:]/g, "")
-    .replace(/\.\d+Z$/, "Z");
+    .replace(".", "");
 }
 
 function createEmptyRunGraph(rootDir: string): CapabilityGraph {
