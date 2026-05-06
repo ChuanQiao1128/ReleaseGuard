@@ -25,6 +25,14 @@ Run all fixture checks:
 npm run releaseguard:selfcheck
 ```
 
+Run on a real git diff:
+
+```bash
+npm run releaseguard -- run --base main --head HEAD
+# or
+npm run releaseguard -- run --base origin/main --head HEAD
+```
+
 `demo-discount-regression` expected output:
 
 ```text
@@ -72,11 +80,13 @@ It supports:
 - Deterministic `PASS` / `WARN` / `BLOCK` decisions.
 - Markdown reports under `artifacts/releaseguard/<run_id>/report.md`.
 - Fixture demos for `BLOCK`, `WARN`, and `PASS`.
+- Real git diff mode using changed file paths from `git diff`.
+- GitHub Actions fixture self-checks.
 
 It does not support:
 
 - RAG, embeddings, pgvector, or vector search.
-- GitHub App, GitHub Actions, OAuth, or webhook integration.
+- GitHub App, OAuth, webhook integration, PR comments, or GitHub check enforcement.
 - Generated tests, self-healing tests, or Playwright browser flows.
 - OpenAPI diff, contract runners, database migration runners, or dashboards.
 - Monorepos beyond this local npm workspace demo.
@@ -159,6 +169,31 @@ Scanner artifacts are written to:
 
 - `.releaseguard/capability_graph.json`
 - `.releaseguard/coverage_report.md`
+
+## Real PR Diff Mode
+
+ReleaseGuard v0.1.5 can read real changed file paths from git:
+
+```bash
+npm run releaseguard -- run --base main --head HEAD
+npm run releaseguard -- run --base origin/main --head HEAD
+```
+
+Real diff mode uses:
+
+```bash
+git diff --name-only --diff-filter=ACMRT <base> <head>
+```
+
+It then feeds those changed files into the same scope analyzer, scanner, impact fallback, evidence planner, selected test executor, decision engine, and markdown report pipeline used by the fixture demos.
+
+Expected v0.1.5 behavior:
+
+- docs-only changes, such as `README.md`, return `PASS` with `low-risk docs-only change.`
+- `apps/demo-app/src/app/api/discount/apply/route.ts` maps to `api_apply_discount`, traverses to `route_checkout`, and selects `tests/api/discount.test.ts`.
+- unmapped source changes return `WARN` with `source change could not be mapped to known capability.`
+
+Real diff mode requires a git repository and valid refs. If git is unavailable or refs are invalid, use the fixture commands for the demo path. GitHub Actions still runs fixture self-checks first; real PR workflow enforcement is not part of v0.1.5.
 
 ## Run In CI
 

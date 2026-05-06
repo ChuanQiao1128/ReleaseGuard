@@ -1,8 +1,5 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { ChangedFile, getChangedFilesFromGitDiff } from "./gitDiffProvider";
 import { analyzeScope, ScopeAnalysis } from "./scopeAnalyzer";
-
-const execFileAsync = promisify(execFile);
 
 export type ChangeScope =
   | {
@@ -24,6 +21,7 @@ export type ChangeScope =
       base: string;
       head: string;
       changedFiles: string[];
+      changedFileDetails: ChangedFile[];
       scope: ScopeAnalysis;
       docsOnly: boolean;
     };
@@ -70,15 +68,12 @@ export async function resolveChangeScope(args: {
     throw new Error("releaseguard run requires --base/--head or --fixture.");
   }
 
-  const { stdout } = await execFileAsync(
-    "git",
-    ["diff", "--name-only", `${args.base}..${args.head}`],
-    { cwd: args.rootDir },
-  );
-  const changedFiles = stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const changedFileDetails = await getChangedFilesFromGitDiff({
+    rootDir: args.rootDir,
+    base: args.base,
+    head: args.head,
+  });
+  const changedFiles = changedFileDetails.map((file) => file.path);
 
   const scope = analyzeScope(changedFiles);
   return {
@@ -86,6 +81,7 @@ export async function resolveChangeScope(args: {
     base: args.base,
     head: args.head,
     changedFiles,
+    changedFileDetails,
     scope,
     docsOnly: scope.classification === "docs_only",
   };

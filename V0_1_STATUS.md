@@ -248,4 +248,37 @@ Issues:
 - Latest PASS fixture report: `artifacts/releaseguard/20260506T125812894Z/report.md`.
 
 Next:
-- Commit, tag `releaseguard-v0.1.4`, and push the branch/tag.
+- `v0.1.4-github-actions` was committed, tagged as `releaseguard-v0.1.4`, pushed, and fast-forward merged to `main`.
+- Continue with v0.1.5 real PR diff mode.
+
+## v0.1.5 Real PR Diff Mode
+
+Status: Done
+
+Done:
+- Fast-forward merged `v0.1.4-github-actions` into `main` and pushed `main`.
+- Created branch `v0.1.5-real-diff-mode`.
+- Added `GitDiffProvider` for real changed-file discovery with `git diff --name-only --diff-filter=ACMRT <base> <head>`.
+- Kept fixture mode and real diff mode on the same downstream scope/scanner/impact/evidence/executor/decision/report pipeline.
+- Added a fail-safe `WARN` path for source changes that cannot be mapped to a known capability.
+- Added tests for GitDiffProvider, docs-only real diff PASS, discount API real diff mapping, and unmapped source WARN.
+- Updated README with real PR diff mode usage and limitations.
+- Verified real diff mode against `main..HEAD`; this branch's ReleaseGuard source changes are intentionally unmapped by the v0.1 demo scanner and return fail-safe `WARN`.
+
+Tests run:
+- `npm run test --workspace releaseguard`
+- `npm run build --workspace releaseguard`
+- `npm test`
+- `npm run build --workspace @releaseguard/demo-app`
+- `npm run releaseguard -- run --fixture demo-discount-regression`
+- `npm run releaseguard -- run --fixture demo-missing-evidence`
+- `npm run releaseguard -- run --fixture demo-docs-only`
+- `npm run releaseguard:selfcheck`
+- `npm run test --workspace @releaseguard/demo-app`
+- `npm run releaseguard -- run --base main --head HEAD`
+
+Issues:
+- None currently.
+
+Next:
+- Tag `releaseguard-v0.1.5` and push the branch/tag.

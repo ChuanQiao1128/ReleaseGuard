@@ -1,2 +1,2 @@
 export { parseCliArgs, runCli } from "./cli";
-export { runReleaseGuard } from "./run";
+export { runReleaseGuard, runReleaseGuardWithScope } from "./run";

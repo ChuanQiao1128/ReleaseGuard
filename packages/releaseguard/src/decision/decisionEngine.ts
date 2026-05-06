@@ -15,6 +15,7 @@ export function decide(input: {
   evidencePlan: EvidencePlan;
   executionResult: EvidenceExecutionResult;
   infrastructureFailed?: boolean;
+  unmappedSourceChange?: boolean;
   docsOnly?: boolean;
 }): DecisionResult {
   if (
@@ -34,6 +35,13 @@ export function decide(input: {
     return {
       decision: "WARN",
       reason: "high-risk capability has missing required evidence.",
+    };
+  }
+
+  if (input.unmappedSourceChange) {
+    return {
+      decision: "WARN",
+      reason: "source change could not be mapped to known capability.",
     };
   }
 

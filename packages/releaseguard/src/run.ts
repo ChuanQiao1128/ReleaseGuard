@@ -4,7 +4,7 @@ import { DeterministicChangeImpactAgent } from "./agents/changeImpactAgent";
 import { ChangeImpactAgentOutput } from "./agents/schemas";
 import { validateChangeImpactOutput } from "./citations/citationValidator";
 import { decide, DecisionResult } from "./decision/decisionEngine";
-import { resolveChangeScope } from "./diff/diffParser";
+import { ChangeScope, resolveChangeScope } from "./diff/diffParser";
 import { planEvidence } from "./evidence/evidencePlanner";
 import { EvidencePlan } from "./evidence/types";
 import {
@@ -40,16 +40,28 @@ export async function runReleaseGuard(
   options: RunReleaseGuardOptions,
 ): Promise<RunReleaseGuardResult> {
   const rootDir = options.rootDir;
-  const runId = createRunId();
-  const artifactDir = path.join(rootDir, "artifacts/releaseguard", runId);
-  await fs.mkdir(artifactDir, { recursive: true });
-
   const scope = await resolveChangeScope({
     rootDir,
     base: options.base,
     head: options.head,
     fixture: options.fixture,
   });
+
+  return runReleaseGuardWithScope({
+    rootDir,
+    scope,
+  });
+}
+
+export async function runReleaseGuardWithScope(options: {
+  rootDir: string;
+  scope: ChangeScope;
+}): Promise<RunReleaseGuardResult> {
+  const rootDir = options.rootDir;
+  const runId = createRunId();
+  const artifactDir = path.join(rootDir, "artifacts/releaseguard", runId);
+  await fs.mkdir(artifactDir, { recursive: true });
+  const scope = options.scope;
 
   if (scope.docsOnly) {
     const graph = createEmptyRunGraph(rootDir);
@@ -132,14 +144,18 @@ export async function runReleaseGuard(
       await executionFixtureRestore?.restore();
     }
 
+    const unmappedSourceChange = isUnmappedSourceChange(scope, impact);
     const decision = decide({
       graph,
       evidencePlan,
       executionResult,
       docsOnly: scope.docsOnly,
+      unmappedSourceChange,
       infrastructureFailed:
         !validation.valid ||
-        (impact.affected_capability_ids.length === 0 && !scope.docsOnly),
+        (!unmappedSourceChange &&
+          impact.affected_capability_ids.length === 0 &&
+          !scope.docsOnly),
     });
 
     const reportPath = path.join(artifactDir, "report.md");
@@ -170,6 +186,18 @@ export async function runReleaseGuard(
   } finally {
     await preScanFixtureRestore?.restore();
   }
+}
+
+function isUnmappedSourceChange(
+  scope: ChangeScope,
+  impact: ChangeImpactAgentOutput,
+): boolean {
+  return (
+    !scope.docsOnly &&
+    scope.scope.classification === "source_or_test_change" &&
+    impact.affected_capability_ids.length === 0 &&
+    impact.unresolved_items.length > 0
+  );
 }
 
 function createRunId(): string {
