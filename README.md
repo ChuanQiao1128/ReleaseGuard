@@ -103,6 +103,39 @@ It does not support:
 - Monorepos beyond this local npm workspace demo.
 - Endpoint constants, template literals, axios wrappers, tRPC, GraphQL, generated clients, OpenAPI clients, and dynamic URLs.
 
+## v0.2 Preview: Repo Memory
+
+v0.1 uses the Capability Graph for structured code dependencies:
+
+```text
+file -> route/API/test -> evidence -> PASS/WARN/BLOCK
+```
+
+v0.2 begins Repo Memory RAG for unstructured repository knowledge:
+
+- docs,
+- ADRs,
+- incidents,
+- previous ReleaseGuard reports.
+
+The first v0.2 task only loads and chunks local markdown memory sources:
+
+```bash
+npm run releaseguard -- memory index
+```
+
+This writes:
+
+```text
+.releaseguard/memory_chunks.json
+```
+
+TASK-RAG-001 does not retrieve, rank, generate embeddings, call an LLM, or affect evidence planning. The v0.2 principle is:
+
+```text
+Graph for structured dependencies. RAG for unstructured repo memory.
+```
+
 ## Day 1 demo app
 
 The v0.1 demo app lives in `apps/demo-app`.

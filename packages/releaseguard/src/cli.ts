@@ -3,6 +3,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import { runReleaseGuard } from "./run";
 import { Decision } from "./decision/decisionEngine";
+import { writeRepoMemoryIndex } from "./memory/memoryIndex";
 
 export type CliArgs =
   | {
@@ -11,6 +12,10 @@ export type CliArgs =
       head?: string;
       fixture?: string;
       expectDecision?: Decision;
+    }
+  | {
+      command: "memory";
+      action: "index";
     }
   | { command: "help" };
 
@@ -21,6 +26,20 @@ export function parseCliArgs(argv: string[]): CliArgs {
   if (!command || command === "--help" || command === "-h") {
     return { command: "help" };
   }
+  if (command === "memory") {
+    const [action, ...extra] = rest;
+    if (action !== "index") {
+      throw new Error("memory requires the index subcommand.");
+    }
+    if (extra.length > 0) {
+      throw new Error(`Unknown argument: ${extra[0]}`);
+    }
+    return {
+      command: "memory",
+      action: "index",
+    };
+  }
+
   if (command !== "run") {
     throw new Error(`Unknown command: ${command}`);
   }
@@ -61,6 +80,17 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   }
 
   const rootDir = resolveRootDir();
+  if (args.command === "memory") {
+    const result = await writeRepoMemoryIndex(rootDir);
+    const outputPath = path
+      .relative(rootDir, result.outputPath)
+      .split(path.sep)
+      .join("/");
+    console.log(`Memory chunks: ${result.chunks.length}`);
+    console.log(`Output: ${outputPath}`);
+    return;
+  }
+
   const result = await runReleaseGuard({
     rootDir,
     base: args.base,
@@ -134,6 +164,7 @@ function usage(): string {
     "  releaseguard run --fixture demo-missing-evidence",
     "  releaseguard run --fixture demo-docs-only",
     "  releaseguard run --fixture demo-docs-only --expect-decision PASS",
+    "  releaseguard memory index",
   ].join("\n");
 }
 

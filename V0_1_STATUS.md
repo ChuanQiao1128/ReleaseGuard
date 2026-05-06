@@ -340,3 +340,28 @@ Issues:
 
 Next:
 - Commit, tag `releaseguard-v0.1.7`, and push the branch/tag.
+
+## v0.1.8 Verified GitHub Actions PR Preview
+
+Status: Done
+
+Done:
+- Merged PR #1, `docs: verify releaseguard real diff preview`, into `main`.
+- Tagged `releaseguard-v0.1.8` as the first GitHub Actions verified PR preview.
+- Verified the real PR path:
+  - docs-only change
+  - GitHub Actions fixture self-check passed
+  - real diff preview returned `Decision: PASS`
+  - `releaseguard-artifacts` uploaded
+- Added a README link to the verified PR.
+
+Tests run:
+- `npm run releaseguard -- run --base main --head HEAD` on the docs-only PR branch.
+- GitHub Actions run `25438835954` on PR #1.
+
+Issues:
+- None currently.
+
+Next:
+- v0.1 is complete at `releaseguard-v0.1.8`.
+- v0.2 has started on branch `v0.2-rag-memory` with Repo Memory Source Loader + Chunker.

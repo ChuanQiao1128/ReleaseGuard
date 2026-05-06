@@ -42,6 +42,19 @@ describe("parseCliArgs", () => {
     });
   });
 
+  it("parses memory index arguments", () => {
+    expect(parseCliArgs(["memory", "index"])).toEqual({
+      command: "memory",
+      action: "index",
+    });
+  });
+
+  it("rejects memory without index", () => {
+    expect(() => parseCliArgs(["memory"])).toThrow(
+      "memory requires the index subcommand.",
+    );
+  });
+
   it("rejects invalid expected decisions", () => {
     expect(() =>
       parseCliArgs([
