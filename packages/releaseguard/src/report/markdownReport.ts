@@ -5,6 +5,7 @@ import { ChangeScope } from "../diff/diffParser";
 import { EvidencePlan } from "../evidence/types";
 import { EvidenceExecutionResult } from "../executor/selectedTestExecutor";
 import { CapabilityGraph } from "../graph/types";
+import { HistoricalRiskContext } from "../memory/historicalRiskContext";
 
 export function renderMarkdownReport(input: {
   graph: CapabilityGraph;
@@ -13,6 +14,7 @@ export function renderMarkdownReport(input: {
   evidencePlan: EvidencePlan;
   executionResult: EvidenceExecutionResult;
   decision: DecisionResult;
+  historicalRiskContexts?: HistoricalRiskContext[];
   graphPath?: string;
   coveragePath?: string;
   artifactDir: string;
@@ -43,12 +45,21 @@ export function renderMarkdownReport(input: {
           `- ${evidence.testId}: ${evidence.testFile} for ${evidence.capabilityId} (${evidence.caseTags.join(", ")})`,
       ),
     ),
+    ...historicalRiskContextSection(input.historicalRiskContexts ?? []),
     "",
     "## Missing evidence",
     ...listOrNone(
       input.evidencePlan.missingEvidence.map(
-        (missing) =>
-          `- ${missing.capabilityId}: ${missing.reason} (${missing.requiredTags.join(", ")})`,
+        (missing) => {
+          const tags = missing.requiredTags.length > 0
+            ? missing.requiredTags.join(", ")
+            : missing.evidenceType ?? "evidence";
+          const target = missing.target ? ` target=${missing.target}` : "";
+          const contexts = missing.sourceContextIds?.length
+            ? ` source_context=${missing.sourceContextIds.join(",")}`
+            : "";
+          return `- ${missing.capabilityId}: ${missing.reason} (${tags}${target}${contexts})`;
+        },
       ),
     ),
     "",
@@ -82,6 +93,22 @@ function changedFileLines(scope: ChangeScope): string[] {
 
 function listOrNone(items: string[]): string[] {
   return items.length > 0 ? items : ["- None"];
+}
+
+function historicalRiskContextSection(
+  contexts: HistoricalRiskContext[],
+): string[] {
+  if (contexts.length === 0) {
+    return [];
+  }
+  return [
+    "",
+    "## Historical risk context",
+    ...contexts.map(
+      (context) =>
+        `- ${context.context_id}: ${context.validation_status} ${context.evidence_implication} for ${context.affected_capability_ids.join(", ")} (${context.source_chunk_ids.join(", ")}) - ${context.summary}`,
+    ),
+  ];
 }
 
 function scannerCoverageLines(

@@ -1,7 +1,11 @@
 import { TestCaseTag } from "../graph/types";
 
-export type EvidenceRequirementType = "existing_test" | "missing_evidence";
+export type EvidenceRequirementType =
+  | "existing_test"
+  | "missing_evidence"
+  | "browser_smoke";
 export type CoverageDepth = "direct" | "transitive";
+export type EvidencePriority = "low" | "medium" | "high";
 
 export type EvidenceRequirement = {
   id: string;
@@ -9,6 +13,9 @@ export type EvidenceRequirement = {
   capabilityId: string;
   requiredTags: TestCaseTag[];
   description: string;
+  target?: string;
+  priority?: EvidencePriority;
+  sourceContextIds?: string[];
 };
 
 export type SelectedEvidence = {
@@ -25,6 +32,10 @@ export type MissingEvidence = {
   capabilityId: string;
   reason: string;
   requiredTags: TestCaseTag[];
+  evidenceType?: EvidenceRequirementType;
+  target?: string;
+  priority?: EvidencePriority;
+  sourceContextIds?: string[];
 };
 
 export type EvidencePlan = {
@@ -32,4 +43,3 @@ export type EvidencePlan = {
   selectedEvidence: SelectedEvidence[];
   missingEvidence: MissingEvidence[];
 };
-

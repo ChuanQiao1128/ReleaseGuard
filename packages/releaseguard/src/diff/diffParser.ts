@@ -4,7 +4,10 @@ import { analyzeScope, ScopeAnalysis } from "./scopeAnalyzer";
 export type ChangeScope =
   | {
       mode: "fixture";
-      fixture: "demo-discount-regression" | "demo-missing-evidence";
+      fixture:
+        | "demo-discount-regression"
+        | "demo-missing-evidence"
+        | "demo-rag-elevated-evidence";
       changedFiles: string[];
       scope: ScopeAnalysis;
       docsOnly: false;
@@ -36,6 +39,7 @@ export async function resolveChangeScope(args: {
     if (
       args.fixture !== "demo-discount-regression" &&
       args.fixture !== "demo-missing-evidence" &&
+      args.fixture !== "demo-rag-elevated-evidence" &&
       args.fixture !== "demo-docs-only"
     ) {
       throw new Error(`Unknown fixture: ${args.fixture}`);

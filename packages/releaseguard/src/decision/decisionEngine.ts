@@ -29,12 +29,26 @@ export function decide(input: {
 
   if (
     input.evidencePlan.missingEvidence.some(
-      (missing) => getNodeRisk(input.graph, missing.capabilityId) === "high",
+      (missing) =>
+        missing.evidenceType !== "browser_smoke" &&
+        getNodeRisk(input.graph, missing.capabilityId) === "high",
     )
   ) {
     return {
       decision: "WARN",
       reason: "high-risk capability has missing required evidence.",
+    };
+  }
+
+  if (
+    input.evidencePlan.missingEvidence.some(
+      (missing) => missing.evidenceType === "browser_smoke",
+    )
+  ) {
+    return {
+      decision: "WARN",
+      reason:
+        "trusted repo memory raised evidence requirement, but required browser evidence is missing.",
     };
   }
 

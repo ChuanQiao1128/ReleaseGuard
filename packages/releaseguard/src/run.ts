@@ -16,6 +16,10 @@ import {
   applyDemoMissingEvidenceFixture,
 } from "./fixtures/regressionFixture";
 import { CapabilityGraph } from "./graph/types";
+import {
+  HistoricalRiskContext,
+  resolveHistoricalRiskContexts,
+} from "./memory/historicalRiskContext";
 import { renderMarkdownReport } from "./report/markdownReport";
 import { scanRepository } from "./scanner/repoScanner";
 
@@ -34,6 +38,7 @@ export type RunReleaseGuardResult = {
   impact: ChangeImpactAgentOutput;
   evidencePlan: EvidencePlan;
   executionResult: EvidenceExecutionResult;
+  historicalRiskContexts: HistoricalRiskContext[];
 };
 
 export async function runReleaseGuard(
@@ -68,6 +73,7 @@ export async function runReleaseGuardWithScope(options: {
     const impact = emptyImpact();
     const evidencePlan = emptyEvidencePlan();
     const executionResult = await writeEmptyExecutionResult(artifactDir);
+    const historicalRiskContexts: HistoricalRiskContext[] = [];
     const decision = decide({
       graph,
       evidencePlan,
@@ -84,6 +90,7 @@ export async function runReleaseGuardWithScope(options: {
         evidencePlan,
         executionResult,
         decision,
+        historicalRiskContexts,
         artifactDir,
       }),
     );
@@ -96,6 +103,7 @@ export async function runReleaseGuardWithScope(options: {
       impact,
       evidencePlan,
       executionResult,
+      historicalRiskContexts,
     };
   }
 
@@ -124,9 +132,18 @@ export async function runReleaseGuardWithScope(options: {
           })),
         };
 
+    const historicalRiskResolution = await resolveHistoricalRiskContexts({
+      rootDir,
+      graph,
+      affectedCapabilityIds: impact.affected_capability_ids,
+      modifiedFiles: scope.changedFiles,
+    });
+    const historicalRiskContexts = historicalRiskResolution.contexts;
+
     const evidencePlan = planEvidence({
       graph,
       affectedCapabilityIds: impact.affected_capability_ids,
+      historicalRiskContexts,
     });
 
     let executionResult: EvidenceExecutionResult;
@@ -168,6 +185,7 @@ export async function runReleaseGuardWithScope(options: {
         evidencePlan,
         executionResult,
         decision,
+        historicalRiskContexts,
         graphPath: scannerResult.graphPath,
         coveragePath: scannerResult.coveragePath,
         artifactDir,
@@ -182,6 +200,7 @@ export async function runReleaseGuardWithScope(options: {
       impact,
       evidencePlan,
       executionResult,
+      historicalRiskContexts,
     };
   } finally {
     await preScanFixtureRestore?.restore();

@@ -229,6 +229,7 @@ function usage(): string {
     "  releaseguard run --fixture demo-discount-regression",
     "  releaseguard run --fixture demo-missing-evidence",
     "  releaseguard run --fixture demo-docs-only",
+    "  releaseguard run --fixture demo-rag-elevated-evidence",
     "  releaseguard run --fixture demo-docs-only --expect-decision PASS",
     "  releaseguard memory index",
     "  releaseguard memory benchmark",

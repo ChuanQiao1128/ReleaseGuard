@@ -240,6 +240,40 @@ v0.2 RAG is report-only. It does not affect evidence planning, does not lower ev
 
 v0.2 does not support pgvector, live GitHub issue/PR sync, reranking, arbitrary CI log ingestion, PR comments, GitHub App/OAuth, generated tests, Playwright browser flows, OpenAPI diff, or dashboards.
 
+## v0.3 RAG-informed Evidence Priority
+
+v0.3 lets trusted repo memory raise evidence priority in the conservative
+direction only.
+
+```text
+Capability Graph -> affected capabilities
+Repo Memory RAG -> validated historical risk context
+Evidence Planner -> added required evidence
+Decision Engine -> deterministic PASS/WARN/BLOCK
+```
+
+RAG still cannot directly decide merge outcome. It cannot lower evidence
+requirements, cannot mark evidence as passed, cannot change capability risk,
+and current-PR modified docs cannot justify current-run evidence priority.
+
+Run the v0.3 demo:
+
+```bash
+npm run releaseguard -- run --fixture demo-rag-elevated-evidence
+# Decision: WARN
+# Reason: trusted repo memory raised evidence requirement, but required browser evidence is missing.
+```
+
+The fixture simulates a discount API change where existing API evidence passes.
+ReleaseGuard then retrieves trusted checkout/discount repo memory:
+
+- `ADR 0007: Checkout Critical Flow`
+- `2024-08 Discount Validation Crash`
+
+That validated context adds a missing high-priority `browser_smoke` requirement
+for `/checkout`. v0.3 does not implement a browser executor, so the missing
+browser evidence produces `WARN`, not `BLOCK`.
+
 ## Day 1 demo app
 
 The v0.1 demo app lives in `apps/demo-app`.

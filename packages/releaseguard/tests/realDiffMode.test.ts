@@ -45,9 +45,18 @@ describe("real diff mode pipeline", () => {
       ]),
     );
     expect(result.decision).toEqual({
-      decision: "PASS",
-      reason: "required selected evidence passed.",
+      decision: "WARN",
+      reason:
+        "trusted repo memory raised evidence requirement, but required browser evidence is missing.",
     });
+    expect(result.evidencePlan.missingEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          evidenceType: "browser_smoke",
+          target: "/checkout",
+        }),
+      ]),
+    );
   });
 
   it("blocks real diff discount API changes when selected evidence fails", async () => {
