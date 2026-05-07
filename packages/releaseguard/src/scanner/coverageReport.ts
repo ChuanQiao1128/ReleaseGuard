@@ -1,6 +1,11 @@
 import { ScannerCoverage } from "./types";
+import { renderSuggestedOverrideSnippet, suggestOverrides } from "./overrideSuggestion";
 
 export function renderCoverageReport(coverage: ScannerCoverage): string {
+  const suggestions = suggestOverrides({
+    coverage,
+    unresolvedCallsites: coverage.unresolvedCallsites,
+  });
   const lines: string[] = [
     "# ReleaseGuard Scanner Coverage",
     "",
@@ -42,6 +47,9 @@ export function renderCoverageReport(coverage: ScannerCoverage): string {
     `- low: ${coverage.confidenceBreakdown.low}`,
     `- unresolved: ${coverage.confidenceBreakdown.unresolved}`,
     "",
+    "## Suggested override snippets",
+    ...renderSuggestedOverrideSnippet(suggestions),
+    "",
     "## Limitations",
     ...coverage.limitations.map((limitation) => `- ${limitation}`),
     "",
@@ -53,4 +61,3 @@ export function renderCoverageReport(coverage: ScannerCoverage): string {
 function listOrNone(items: string[]): string[] {
   return items.length > 0 ? items : ["- None"];
 }
-

@@ -17,11 +17,23 @@ type FetchLiteralMatch = {
   url: string;
   method: string;
   index: number;
+  confidence: "high" | "medium";
+  confidenceBasis: string;
 };
 
 type RouteContext = {
   route: RouteScanResult;
   files: Set<string>;
+};
+
+type FetchWrapperDefinition = {
+  name: string;
+  fetchIndex: number;
+};
+
+type FetchScanAnalysis = {
+  matches: FetchLiteralMatch[];
+  ignoredFetchIndexes: Set<number>;
 };
 
 export async function scanFetchLiterals(
@@ -41,23 +53,22 @@ export async function scanFetchLiterals(
       const relativePath = toRepoRelativePath(rootDir, absoluteFile);
       addFileNode(graph, rootDir, absoluteFile, "frontend_file_scanned");
       const source = await fs.readFile(absoluteFile, "utf8");
-      const resolved = findDirectFetchLiterals(source);
-      const resolvedIndexes = new Set(resolved.map((match) => match.index));
+      const analysis = findResolvableApiCallsites(source);
 
-      for (const match of resolved) {
+      for (const match of analysis.matches) {
         const api = apiByTarget.get(`${match.method} ${match.url}`);
         if (!api) {
-        const unresolved: UnresolvedCallsite = {
-          filePath: relativePath,
-          line: lineForIndex(source, match.index),
-          reason: `No scanned API matched ${match.method} ${match.url}.`,
-          quote: lineQuote(source, lineForIndex(source, match.index)),
-          confidence: "unresolved",
-        };
-        coverage.unresolvedCallsites.push({
-          ...unresolved,
-          pattern: classifyUnresolvedPattern(unresolved),
-        });
+          const unresolved: UnresolvedCallsite = {
+            filePath: relativePath,
+            line: lineForIndex(source, match.index),
+            reason: `No scanned API matched ${match.method} ${match.url}.`,
+            quote: lineQuote(source, lineForIndex(source, match.index)),
+            confidence: "unresolved",
+          };
+          coverage.unresolvedCallsites.push({
+            ...unresolved,
+            pattern: classifyUnresolvedPattern(unresolved),
+          });
           continue;
         }
 
@@ -66,15 +77,15 @@ export async function scanFetchLiterals(
           context.route.routeNode.id,
           "consumes",
           api.apiNode.id,
-          "high",
-          "direct_fetch_literal",
+          match.confidence,
+          match.confidenceBasis,
           [
             {
               filePath: relativePath,
               lineStart: line,
               lineEnd: line,
               quote: lineQuote(source, line),
-              reason: "Direct fetch literal connects route UI to API.",
+              reason: `${match.confidenceBasis} connects route UI to API.`,
             },
           ],
           { method: match.method, path: match.url },
@@ -87,15 +98,15 @@ export async function scanFetchLiterals(
           apiId: api.apiNode.id,
           method: match.method,
           path: match.url,
-          confidence: "high",
-          confidenceBasis: "direct_fetch_literal",
+          confidence: match.confidence,
+          confidenceBasis: match.confidenceBasis,
         });
       }
 
       for (const unresolved of findUnsupportedFetches(
         source,
         relativePath,
-        resolvedIndexes,
+        analysis.ignoredFetchIndexes,
       )) {
         coverage.unresolvedCallsites.push(unresolved);
       }
@@ -114,9 +125,217 @@ export function findDirectFetchLiterals(source: string): FetchLiteralMatch[] {
       url: match[2],
       method: methodMatch?.[2]?.toUpperCase() ?? "GET",
       index: match.index,
+      confidence: "high",
+      confidenceBasis: "direct_fetch_literal",
     });
   }
   return matches;
+}
+
+export function findResolvableApiCallsites(source: string): FetchScanAnalysis {
+  const matches: FetchLiteralMatch[] = [];
+  const ignoredFetchIndexes = new Set<number>();
+  const seen = new Set<string>();
+  const endpointConstants = findEndpointConstants(source);
+  const wrappers = findFetchWrapperDefinitions(source);
+  const wrapperNames = new Set(wrappers.map((wrapper) => wrapper.name));
+
+  for (const wrapper of wrappers) {
+    ignoredFetchIndexes.add(wrapper.fetchIndex);
+  }
+
+  for (const match of findDirectFetchLiterals(source)) {
+    addMatch(matches, seen, match);
+    ignoredFetchIndexes.add(match.index);
+  }
+
+  for (const match of findFetchConstantCalls(source, endpointConstants)) {
+    addMatch(matches, seen, match);
+    ignoredFetchIndexes.add(match.index);
+  }
+
+  for (const match of findWrapperLiteralCalls(source, wrapperNames)) {
+    addMatch(matches, seen, match);
+  }
+
+  for (const match of findWrapperConstantCalls(
+    source,
+    wrapperNames,
+    endpointConstants,
+  )) {
+    addMatch(matches, seen, match);
+  }
+
+  return { matches, ignoredFetchIndexes };
+}
+
+function addMatch(
+  matches: FetchLiteralMatch[],
+  seen: Set<string>,
+  match: FetchLiteralMatch,
+): void {
+  const key = `${match.index}:${match.method}:${match.url}`;
+  if (seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  matches.push(match);
+}
+
+function findEndpointConstants(source: string): Map<string, string> {
+  const constants = new Map<string, string>();
+  const constantRegex =
+    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(["'])(\/api\/[^"']+)\2/g;
+  let match: RegExpExecArray | null;
+  while ((match = constantRegex.exec(source))) {
+    constants.set(match[1], match[3]);
+  }
+  return constants;
+}
+
+function findFetchConstantCalls(
+  source: string,
+  endpointConstants: Map<string, string>,
+): FetchLiteralMatch[] {
+  const matches: FetchLiteralMatch[] = [];
+  const fetchIdentifierRegex = /fetch\s*\(\s*([A-Za-z_$][\w$]*)/g;
+  let match: RegExpExecArray | null;
+  while ((match = fetchIdentifierRegex.exec(source))) {
+    const url = endpointConstants.get(match[1]);
+    if (!url) {
+      continue;
+    }
+    const window = source.slice(match.index, match.index + 400);
+    const methodMatch = /method\s*:\s*(["'])([A-Za-z]+)\1/.exec(window);
+    matches.push({
+      url,
+      method: methodMatch?.[2]?.toUpperCase() ?? "GET",
+      index: match.index,
+      confidence: "medium",
+      confidenceBasis: "endpoint_constant_literal",
+    });
+  }
+  return matches;
+}
+
+function findFetchWrapperDefinitions(source: string): FetchWrapperDefinition[] {
+  const wrappers: FetchWrapperDefinition[] = [];
+  const arrowRegex =
+    /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(?\s*([A-Za-z_$][\w$]*)(?:\s*:[^)]+)?\s*\)?\s*=>\s*fetch\s*\(\s*\2/g;
+  let match: RegExpExecArray | null;
+  while ((match = arrowRegex.exec(source))) {
+    const fetchIndex = match.index + match[0].lastIndexOf("fetch");
+    if (fetchIndex >= 0) {
+      wrappers.push({ name: match[1], fetchIndex });
+    }
+  }
+
+  const functionRegex =
+    /\bfunction\s+([A-Za-z_$][\w$]*)\s*\(\s*([A-Za-z_$][\w$]*)[^)]*\)\s*\{[\s\S]*?fetch\s*\(\s*\2/g;
+  while ((match = functionRegex.exec(source))) {
+    const fetchIndex = match.index + match[0].lastIndexOf("fetch");
+    if (fetchIndex >= 0) {
+      wrappers.push({ name: match[1], fetchIndex });
+    }
+  }
+
+  return wrappers;
+}
+
+function findWrapperLiteralCalls(
+  source: string,
+  wrapperNames: Set<string>,
+): FetchLiteralMatch[] {
+  if (wrapperNames.size === 0) {
+    return [];
+  }
+  const matches: FetchLiteralMatch[] = [];
+  const wrapperPattern = [...wrapperNames].map(escapeRegExp).join("|");
+  const wrapperCallRegex = new RegExp(
+    `\\b(?:${wrapperPattern})\\s*\\(\\s*(["'])(\\/api\\/[^"']+)\\1`,
+    "g",
+  );
+  let match: RegExpExecArray | null;
+  while ((match = wrapperCallRegex.exec(source))) {
+    matches.push({
+      url: match[2],
+      method: "GET",
+      index: match.index,
+      confidence: "medium",
+      confidenceBasis: "local_fetch_wrapper_literal",
+    });
+  }
+
+  const swrRegex = new RegExp(
+    `\\buseSWR(?:Immutable)?(?:<[^>]+>)?\\s*\\(\\s*(["'])(\\/api\\/[^"']+)\\1\\s*,\\s*(${wrapperPattern})\\b`,
+    "g",
+  );
+  while ((match = swrRegex.exec(source))) {
+    matches.push({
+      url: match[2],
+      method: "GET",
+      index: match.index,
+      confidence: "medium",
+      confidenceBasis: "swr_fetcher_literal",
+    });
+  }
+
+  return matches;
+}
+
+function findWrapperConstantCalls(
+  source: string,
+  wrapperNames: Set<string>,
+  endpointConstants: Map<string, string>,
+): FetchLiteralMatch[] {
+  if (wrapperNames.size === 0 || endpointConstants.size === 0) {
+    return [];
+  }
+  const matches: FetchLiteralMatch[] = [];
+  const wrapperPattern = [...wrapperNames].map(escapeRegExp).join("|");
+  const constantPattern = [...endpointConstants.keys()].map(escapeRegExp).join("|");
+  const wrapperCallRegex = new RegExp(
+    `\\b(?:${wrapperPattern})\\s*\\(\\s*(${constantPattern})\\b`,
+    "g",
+  );
+  let match: RegExpExecArray | null;
+  while ((match = wrapperCallRegex.exec(source))) {
+    const url = endpointConstants.get(match[1]);
+    if (!url) {
+      continue;
+    }
+    matches.push({
+      url,
+      method: "GET",
+      index: match.index,
+      confidence: "medium",
+      confidenceBasis: "local_fetch_wrapper_endpoint_constant",
+    });
+  }
+
+  const swrRegex = new RegExp(
+    `\\buseSWR(?:Immutable)?(?:<[^>]+>)?\\s*\\(\\s*(${constantPattern})\\s*,\\s*(${wrapperPattern})\\b`,
+    "g",
+  );
+  while ((match = swrRegex.exec(source))) {
+    const url = endpointConstants.get(match[1]);
+    if (!url) {
+      continue;
+    }
+    matches.push({
+      url,
+      method: "GET",
+      index: match.index,
+      confidence: "medium",
+      confidenceBasis: "swr_fetcher_endpoint_constant",
+    });
+  }
+
+  return matches;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function findUnsupportedFetches(

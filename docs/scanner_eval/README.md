@@ -61,3 +61,13 @@ Use scanner eval to choose the next milestone:
 - unresolved rate `> 40%`: prioritize scanner expansion and override UX before
   browser execution.
 
+## v0.4 Result
+
+The initial v0.3.2 pack showed that `leerob/next-saas-starter` detected routes
+and APIs but could not resolve SWR calls hidden behind a local `fetcher(url)`
+wrapper. v0.4 adds support for that narrow pattern and for flat endpoint
+constants.
+
+Scanner eval reports should continue to record unresolved rates after each
+scanner expansion. Browser evidence should only be piloted on framework slices
+where the scanner can first explain affected routes and APIs.

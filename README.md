@@ -310,7 +310,8 @@ Unsupported repositories do not crash the command. They produce an
 ## Scanner evaluation on real repositories
 
 v0.3.2 applies the scanner eval tooling to external repositories before adding
-browser execution. The current reports live under `docs/scanner_eval/`.
+browser execution. The current reports live under
+[docs/scanner_eval](docs/scanner_eval/summary.md).
 Those reports are intentionally excluded from repo-memory indexing so scanner
 evaluation artifacts do not change the v0.2 RAG benchmark corpus.
 
@@ -318,14 +319,22 @@ Summary:
 
 | Repo | Framework | Supported | Routes | APIs | Resolved | Unresolved | Unresolved rate |
 |---|---|---:|---:|---:|---:|---:|---:|
-| `leerob/next-saas-starter` | `nextjs_app_router_typescript` | yes | 8 | 4 | 0 | 2 | 100.0% |
+| `leerob/next-saas-starter` | `nextjs_app_router_typescript` | yes | 8 | 4 | 4 | 0 | 0.0% |
 | `vercel/nextgram` | `nextjs_app_router_typescript` | yes | 3 | 0 | 0 | 0 | 0.0% |
 | `tiangolo/full-stack-fastapi-template` | `unsupported_framework` | no | 0 | 0 | 0 | 1 | 100.0% |
 
-The first supported real app with API routes used a shared dynamic fetcher, so
-ReleaseGuard detected routes and APIs but could not resolve frontend-to-API
-dependencies. That result points v0.4 toward scanner coverage expansion and
-override UX before Playwright browser execution.
+v0.4 resolves the highest-ROI issue from the first supported real app: simple
+local `fetcher(url)` wrappers used with `useSWR<T>("/api/...", fetcher)`. It
+also adds flat endpoint-constant resolution and an optional evidence declaration
+protocol for tests:
+
+```ts
+// @releaseguard:covers api_apply_discount invalid_discount 400 error_status
+```
+
+Evidence declarations are graph-validated. They can make test coverage more
+explicit, but they do not let tests invent capability IDs and they do not let
+agents or RAG change `PASS` / `WARN` / `BLOCK`.
 
 ## Day 1 demo app
 

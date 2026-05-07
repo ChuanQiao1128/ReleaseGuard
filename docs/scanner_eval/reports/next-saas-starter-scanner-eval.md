@@ -13,10 +13,10 @@ Snapshot commit: `6e33e58`
 | Detected routes | 8 |
 | Detected APIs | 4 |
 | Detected test nodes | 0 |
-| Detected frontend-to-API callsites | 2 |
-| Resolved callsites | 0 |
-| Unresolved callsites | 2 |
-| Unresolved rate | 100.0% |
+| Detected frontend-to-API callsites | 4 |
+| Resolved callsites | 4 |
+| Unresolved callsites | 0 |
+| Unresolved rate | 0.0% |
 
 ## Detected Routes
 
@@ -38,18 +38,18 @@ Snapshot commit: `6e33e58`
 
 ## Resolved Callsites
 
-- None
+- `route_dashboard_general` consumes `api_user` at `app/(dashboard)/dashboard/general/page.tsx:65` (`swr_fetcher_literal`)
+- `route_dashboard` consumes `api_team` at `app/(dashboard)/dashboard/page.tsx:41` (`swr_fetcher_literal`)
+- `route_dashboard` consumes `api_team` at `app/(dashboard)/dashboard/page.tsx:97` (`swr_fetcher_literal`)
+- `route_dashboard` consumes `api_user` at `app/(dashboard)/dashboard/page.tsx:191` (`swr_fetcher_literal`)
 
 ## Unresolved Callsites
 
-- `dynamic_url`: `app/(dashboard)/dashboard/general/page.tsx:14`
-  - `const fetcher = (url: string) => fetch(url).then((res) => res.json());`
-- `dynamic_url`: `app/(dashboard)/dashboard/page.tsx:28`
-  - `const fetcher = (url: string) => fetch(url).then((res) => res.json());`
+- None
 
 ## Top Unresolved Patterns
 
-- `dynamic_url`: 2
+- None
 
 ## Suggested Overrides
 
@@ -57,8 +57,6 @@ Snapshot commit: `6e33e58`
 
 ## Notes
 
-The scanner detects App Router routes and route handlers, but does not resolve
-shared fetcher wrappers such as `fetcher(url)`. The next scanner improvement
-with the highest ROI for this repo is simple wrapper and call-argument tracing
-for local fetcher utilities.
-
+v0.4 resolves the simple local `fetcher(url)` wrapper pattern used with
+`useSWR<T>("/api/...", fetcher)`. This repo now exercises route/API dependency
+coverage instead of only route and API node detection.

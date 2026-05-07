@@ -34,8 +34,8 @@ export async function scanRepository(rootDir: string): Promise<{
       unresolved: 0,
     },
     limitations: [
-      "v0.1 resolves only direct fetch string literals.",
-      "Endpoint constants, template literals, axios wrappers, tRPC, GraphQL, generated clients, OpenAPI clients, and dynamic URLs are unresolved.",
+      "v0.4 resolves direct fetch string literals, flat endpoint constants, and simple local fetcher/SWR literals.",
+      "Template literals, axios wrappers, tRPC, GraphQL, generated clients, OpenAPI clients, and complex dynamic URLs are unresolved.",
       "Monorepos and workspace graph traversal are outside v0.1 scope.",
       "v0.1 selects direct API tests only; transitive route evidence is reported as a limitation.",
     ],

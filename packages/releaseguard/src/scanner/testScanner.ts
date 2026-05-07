@@ -5,10 +5,23 @@ import {
   addFileNode,
   addNode,
   makeEdge,
+  sanitizeIdPart,
   toRepoRelativePath,
 } from "../graph/capabilityGraph";
-import { CapabilityGraph, CapabilityNode, TestCaseTag } from "../graph/types";
+import {
+  CapabilityGraph,
+  CapabilityNode,
+  TestCaseTag,
+  testCaseTagSchema,
+} from "../graph/types";
 import { lineForIndex, lineQuote, listFiles } from "./fileUtils";
+
+export type EvidenceDeclaration = {
+  capabilityId: string;
+  caseTags: TestCaseTag[];
+  line: number;
+  quote: string;
+};
 
 export async function scanTests(
   rootDir: string,
@@ -23,6 +36,48 @@ export async function scanTests(
     const relativePath = toRepoRelativePath(rootDir, testFile);
     const source = await fs.readFile(testFile, "utf8");
     const fileNode = addFileNode(graph, rootDir, testFile, "test_file_scanned");
+    const declarations = parseEvidenceDeclarations(source);
+
+    if (declarations.length > 0) {
+      for (const declaration of declarations) {
+        if (!graph.nodes[declaration.capabilityId]) {
+          continue;
+        }
+        const testNode = declaredEvidenceTestNode({
+          declaration,
+          relativePath,
+        });
+        addNode(graph, testNode);
+        addEdge(
+          graph,
+          makeEdge(
+            fileNode.id,
+            "defines",
+            testNode.id,
+            "high",
+            "releaseguard_evidence_declaration",
+            testNode.evidenceRefs,
+          ),
+        );
+        addEdge(
+          graph,
+          makeEdge(
+            declaration.capabilityId,
+            "tested_by",
+            testNode.id,
+            "high",
+            "releaseguard_evidence_declaration",
+            testNode.evidenceRefs,
+            {
+              caseTags: declaration.caseTags,
+              coverageDepth: "direct",
+              evidenceDeclaration: true,
+            },
+          ),
+        );
+      }
+      continue;
+    }
 
     if (isDiscountApiTest(source, relativePath)) {
       const tags = extractInvalidDiscountTags(source);
@@ -51,7 +106,7 @@ export async function scanTests(
         metadata: {
           caseTags: tags,
           targetCapability: "api_apply_discount",
-          testFile: path.posix.relative("apps/demo-app", relativePath),
+          testFile: testFileMetadataPath(relativePath),
         },
       };
       addNode(graph, testNode);
@@ -82,6 +137,69 @@ export async function scanTests(
   }
 }
 
+export function parseEvidenceDeclarations(source: string): EvidenceDeclaration[] {
+  const declarations: EvidenceDeclaration[] = [];
+  const declarationRegex = /@releaseguard:covers\s+([A-Za-z0-9_:-]+)([^\n]*)/g;
+  let match: RegExpExecArray | null;
+  while ((match = declarationRegex.exec(source))) {
+    const line = lineForIndex(source, match.index);
+    declarations.push({
+      capabilityId: match[1],
+      caseTags: parseCaseTags(match[2]),
+      line,
+      quote: lineQuote(source, line),
+    });
+  }
+  return declarations;
+}
+
+function parseCaseTags(rawTags: string): TestCaseTag[] {
+  const tags = new Set<TestCaseTag>();
+  for (const token of rawTags.trim().split(/\s+/).filter(Boolean)) {
+    const parsed = testCaseTagSchema.safeParse(token);
+    if (parsed.success) {
+      tags.add(parsed.data);
+    }
+  }
+  return [...tags];
+}
+
+function declaredEvidenceTestNode(args: {
+  declaration: EvidenceDeclaration;
+  relativePath: string;
+}): CapabilityNode {
+  const tagPart =
+    args.declaration.caseTags.length > 0
+      ? args.declaration.caseTags.join("_")
+      : "declared";
+  return {
+    id: `test_declared_${sanitizeIdPart(args.declaration.capabilityId)}_${sanitizeIdPart(tagPart)}_${args.declaration.line}`,
+    type: "test",
+    name: `declared evidence for ${args.declaration.capabilityId}`,
+    target: `${args.declaration.capabilityId} ${args.declaration.caseTags.join(" ")}`.trim(),
+    filePath: args.relativePath,
+    risk: "low",
+    confidence: "high",
+    confidenceBasis: "releaseguard_evidence_declaration",
+    evidenceRefs: [
+      {
+        filePath: args.relativePath,
+        lineStart: args.declaration.line,
+        lineEnd: args.declaration.line,
+        quote: args.declaration.quote,
+        reason: "Test file declares ReleaseGuard evidence coverage.",
+      },
+    ],
+    metadata: {
+      caseTags: args.declaration.caseTags,
+      targetCapability: args.declaration.capabilityId,
+      testFile: testFileMetadataPath(args.relativePath),
+      evidenceDeclaration: true,
+      declarationLine: args.declaration.line,
+    },
+  };
+}
+
 function isDiscountApiTest(source: string, relativePath: string): boolean {
   return (
     relativePath.endsWith("apps/demo-app/tests/api/discount.test.ts") &&
@@ -103,4 +221,10 @@ function extractInvalidDiscountTags(source: string): TestCaseTag[] {
     tags.add("500");
   }
   return [...tags];
+}
+
+function testFileMetadataPath(relativePath: string): string {
+  return relativePath.startsWith("apps/demo-app/")
+    ? path.posix.relative("apps/demo-app", relativePath)
+    : relativePath;
 }

@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { findUnsupportedFetches } from "../src/scanner/fetchLiteralScanner";
+import {
+  findResolvableApiCallsites,
+  findUnsupportedFetches,
+} from "../src/scanner/fetchLiteralScanner";
 import { scanRepository } from "../src/scanner/repoScanner";
 
 const repoRoot = path.resolve(process.cwd(), "../..");
@@ -77,5 +80,51 @@ describe("repo scanner", () => {
       confidence: "unresolved",
     });
   });
-});
 
+  it("resolves flat endpoint constants used in fetch calls", () => {
+    const source = [
+      "const APPLY_DISCOUNT = '/api/discount/apply';",
+      "fetch(APPLY_DISCOUNT, { method: 'POST' });",
+    ].join("\n");
+
+    const analysis = findResolvableApiCallsites(source);
+
+    expect(analysis.matches).toContainEqual(
+      expect.objectContaining({
+        url: "/api/discount/apply",
+        method: "POST",
+        confidence: "medium",
+        confidenceBasis: "endpoint_constant_literal",
+      }),
+    );
+  });
+
+  it("resolves simple local fetcher wrapper literals without unresolved wrapper noise", () => {
+    const source = [
+      "const fetcher = (url: string) => fetch(url).then((res) => res.json());",
+      "useSWR<User>('/api/user', fetcher);",
+      "fetcher('/api/team');",
+    ].join("\n");
+
+    const analysis = findResolvableApiCallsites(source);
+    const unresolved = findUnsupportedFetches(
+      source,
+      "app/dashboard/page.tsx",
+      analysis.ignoredFetchIndexes,
+    );
+
+    expect(analysis.matches).toEqual([
+      expect.objectContaining({
+        url: "/api/team",
+        method: "GET",
+        confidenceBasis: "local_fetch_wrapper_literal",
+      }),
+      expect.objectContaining({
+        url: "/api/user",
+        method: "GET",
+        confidenceBasis: "swr_fetcher_literal",
+      }),
+    ]);
+    expect(unresolved).toEqual([]);
+  });
+});

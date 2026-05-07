@@ -7,7 +7,7 @@ assumption before adding browser execution.
 
 | Repo | Framework | Supported | Routes | APIs | Resolved callsites | Unresolved callsites | Unresolved rate | Top unresolved patterns |
 |---|---|---:|---:|---:|---:|---:|---:|---|
-| `leerob/next-saas-starter` | `nextjs_app_router_typescript` | yes | 8 | 4 | 0 | 2 | 100.0% | `dynamic_url` |
+| `leerob/next-saas-starter` | `nextjs_app_router_typescript` | yes | 8 | 4 | 4 | 0 | 0.0% | none |
 | `vercel/nextgram` | `nextjs_app_router_typescript` | yes | 3 | 0 | 0 | 0 | 0.0% | none |
 | `tiangolo/full-stack-fastapi-template` | `unsupported_framework` | no | 0 | 0 | 0 | 1 | 100.0% | `unsupported_framework` |
 
@@ -23,16 +23,20 @@ Reports:
   app.
 - Next.js App Router `app/api/**/route.ts` API detection works for exported
   route handlers.
+- v0.4 resolves simple local fetcher wrappers and SWR literals such as
+  `useSWR<T>("/api/user", fetcher)`.
+- v0.4 resolves flat endpoint constants used directly in `fetch(...)` or
+  simple local fetcher calls.
 - Unsupported frameworks are reported explicitly instead of crashing.
 - Scanner eval produces measurable unresolved rates and top unresolved
   categories.
 
 ## What The Scanner Fails On
 
-- Shared fetcher wrappers such as `const fetcher = (url) => fetch(url)` are not
-  resolved.
-- The current direct literal scanner does not trace API endpoint values through
-  SWR or local fetch helper calls.
+- Complex fetcher wrappers, imported API clients, and multi-hop endpoint
+  factories remain out of scope.
+- Axios wrappers, tRPC, GraphQL operations, generated clients, OpenAPI clients,
+  and dynamic URL construction remain unresolved.
 - Backend-only frameworks such as FastAPI are outside the current scanner
   scope.
 - Route-only apps can look clean by unresolved rate while still not exercising
@@ -40,25 +44,25 @@ Reports:
 
 ## Recommendation
 
-v0.4 should prioritize scanner coverage expansion and override UX before a
-Playwright browser runner.
+v0.4 has addressed the highest-ROI issue from the first supported real app:
+simple local fetcher/SWR route-to-API dependency resolution.
 
-Reason: the first supported real app with API routes had `100.0%` unresolved
-frontend-to-API callsites because API calls were hidden behind a dynamic fetcher
-wrapper. A browser runner would not fix the core question of which route/API
-capability changed or which evidence should run.
+Next, ReleaseGuard can pilot a browser smoke runner for supported Next.js repos,
+but scanner eval should stay mandatory before enforcement. If future real repos
+show unresolved rates above `20%`, scanner expansion and override UX should
+again take priority over browser execution.
 
 ## Top Scanner Improvements By Expected ROI
 
-1. Resolve simple local fetcher wrappers and SWR-style calls where a string
-   endpoint is passed to a known wrapper.
-2. Add endpoint-constant tracing for flat string constants used in API calls.
-3. Add an evidence/override declaration protocol so users can confirm
+1. Add coverage for imported API client wrappers and common axios helper
+   patterns.
+2. Add endpoint-constant tracing across imports for flat exported constants.
+3. Expand evidence/override declaration protocols so users can confirm
    unresolved dependencies without hand-writing a large YAML config.
 
 ## Next Milestone Decision
 
-Do not add Playwright yet. Use v0.4 for scanner coverage expansion and override
-suggestion UX, then reevaluate whether the unresolved rate for supported Next.js
-repos is low enough to justify browser evidence execution.
-
+v0.4 scanner expansion is sufficient for the current small real-repo pack. The
+next implementation can be a narrow Playwright/browser smoke pilot for supported
+Next.js repos, guarded by scanner eval and without replacing the deterministic
+Evidence Planner or Decision Engine.
