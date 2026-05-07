@@ -47,6 +47,20 @@ export function renderCoverageReport(coverage: ScannerCoverage): string {
     `- low: ${coverage.confidenceBreakdown.low}`,
     `- unresolved: ${coverage.confidenceBreakdown.unresolved}`,
     "",
+    "## File role counts",
+    ...listOrNone(
+      Object.entries(coverage.fileRoleCounts ?? {})
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([role, count]) => `- ${role}: ${count}`),
+    ),
+    "",
+    "## Resolution level distribution",
+    ...listOrNone(
+      Object.entries(coverage.resolutionLevelCounts ?? {})
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([level, count]) => `- ${level}: ${count}`),
+    ),
+    "",
     "## Suggested override snippets",
     ...renderSuggestedOverrideSnippet(suggestions),
     "",

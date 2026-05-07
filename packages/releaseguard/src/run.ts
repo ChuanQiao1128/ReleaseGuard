@@ -16,6 +16,7 @@ import {
   applyDemoMissingEvidenceFixture,
 } from "./fixtures/regressionFixture";
 import { CapabilityGraph } from "./graph/types";
+import { resolveImpact } from "./impact/impactResolver";
 import {
   HistoricalRiskContext,
   resolveHistoricalRiskContexts,
@@ -114,6 +115,10 @@ export async function runReleaseGuardWithScope(options: {
     }
 
     const { graph, result: scannerResult } = await scanRepository(rootDir);
+    const impactResolution = resolveImpact({
+      changedFiles: scope.changedFiles,
+      graph,
+    });
     const agent = new DeterministicChangeImpactAgent();
     const agentOutput = await agent.analyze({
       changedFiles: scope.changedFiles,
@@ -161,13 +166,17 @@ export async function runReleaseGuardWithScope(options: {
       await executionFixtureRestore?.restore();
     }
 
-    const unmappedSourceChange = isUnmappedSourceChange(scope, impact);
+    const unmappedSourceChange =
+      isUnmappedSourceChange(scope, impact) || impactResolution.failSafeWarn;
     const decision = decide({
       graph,
       evidencePlan,
       executionResult,
       docsOnly: scope.docsOnly,
       unmappedSourceChange,
+      unresolvedImpactReason: impactResolution.failSafeWarn
+        ? impactResolution.reason
+        : undefined,
       infrastructureFailed:
         !validation.valid ||
         (!unmappedSourceChange &&

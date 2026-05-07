@@ -18,6 +18,23 @@ Snapshot commit: `13652b5`
 | Unresolved callsites | 1 |
 | Unresolved rate | 100.0% |
 
+## File Role Counts
+
+- `config`: 12
+- `docs`: 8
+- `source`: 111
+- `test`: 30
+- `unknown`: 72
+
+## Resolution Level Distribution
+
+- `L0_CHANGED_FILE_ONLY`: 233
+- `L1_MODULE_MAPPED`: 4
+- `L2_CONTRACT_MAPPED`: 0
+- `L3_FRAMEWORK_CAPABILITY_MAPPED`: 0
+- `L4_TEST_EVIDENCE_MAPPED`: 0
+- `L5_DECLARED_CAPABILITY_MAPPED`: 0
+
 ## Detected Routes
 
 - None
@@ -47,6 +64,6 @@ Snapshot commit: `13652b5`
 
 The scanner eval command correctly fails safe for unsupported frameworks by
 producing an explicit report instead of crashing or pretending the repo is
-covered. FastAPI support would require a separate backend scanner rather than
-small tweaks to the current Next.js scanner.
-
+covered. v0.5 still records universal file/module/package context for this
+repo, but FastAPI route/API precision would require a separate backend adapter
+rather than small tweaks to the current Next.js scanner.

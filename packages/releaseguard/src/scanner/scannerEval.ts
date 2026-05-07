@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { CapabilityGraph } from "../graph/types";
+import { ResolutionLevelCounts, emptyResolutionLevelCounts } from "../impact/resolutionLevel";
 import { detectFramework } from "./frameworkDetector";
 import { renderSuggestedOverrideSnippet, suggestOverrides, SuggestedOverride } from "./overrideSuggestion";
 import { scanRepository } from "./repoScanner";
@@ -27,6 +28,8 @@ export type ScannerEvalResult = {
     pattern: UnresolvedPatternCategory;
     count: number;
   }>;
+  file_role_counts: Record<string, number>;
+  resolution_level_distribution: ResolutionLevelCounts;
   suggested_overrides: SuggestedOverride[];
   output_dir: string;
   report_path: string;
@@ -56,37 +59,31 @@ export async function runScannerEval(args: {
   let graph: CapabilityGraph | undefined;
   let scannerError: string | undefined;
 
-  if (framework.isNextAppRouter && framework.isTypeScript) {
-    try {
-      const scan = await scanRepository(repoRoot);
-      coverage = {
-        ...scan.result.coverage,
-        unresolvedCallsites: scan.result.coverage.unresolvedCallsites.map(
-          withPattern,
-        ),
-      };
-      graph = scan.graph;
-    } catch (error) {
-      scannerError = error instanceof Error ? error.message : String(error);
+  try {
+    const scan = await scanRepository(repoRoot);
+    coverage = {
+      ...scan.result.coverage,
+      unresolvedCallsites: scan.result.coverage.unresolvedCallsites.map(
+        withPattern,
+      ),
+    };
+    graph = scan.graph;
+    if (!framework.isNextAppRouter || !framework.isTypeScript) {
+      scannerError = "unsupported framework route/API adapter";
     }
-  } else {
-    scannerError = "unsupported framework";
-    coverage.unresolvedCallsites.push({
-      filePath: ".",
-      line: 1,
-      reason: "unsupported framework for scanner eval",
-      quote: frameworkDetected,
-      confidence: "unresolved",
-      pattern: "unsupported_framework",
-    });
+  } catch (error) {
+    scannerError = error instanceof Error ? error.message : String(error);
   }
 
-  if (scannerError && coverage.unresolvedCallsites.length === 0) {
+  if (
+    (!framework.isNextAppRouter || !framework.isTypeScript) &&
+    coverage.unresolvedCallsites.length === 0
+  ) {
     coverage.unresolvedCallsites.push({
       filePath: ".",
       line: 1,
-      reason: scannerError,
-      quote: "",
+      reason: "unsupported framework for route/API scanner; universal fallback ran",
+      quote: frameworkDetected,
       confidence: "unresolved",
       pattern: "unsupported_framework",
     });
@@ -111,6 +108,8 @@ export async function runScannerEval(args: {
       unresolved_callsite_count: unresolvedCallsites.length,
       unresolved_callsite_rate: unresolvedRate(coverage),
       top_unresolved_patterns: patternCounts,
+      file_role_counts: coverage.fileRoleCounts ?? {},
+      resolution_level_distribution: normalizedResolutionCounts(coverage),
       unresolved_callsites: unresolvedCallsites,
       suggested_overrides: suggestions,
     }, null, 2)}\n`,
@@ -120,7 +119,7 @@ export async function runScannerEval(args: {
   const result: ScannerEvalResult = {
     repo_path: repoRoot,
     framework_detected: frameworkDetected,
-    supported: Boolean(graph),
+    supported: framework.isNextAppRouter && framework.isTypeScript && !scannerError,
     scanned_file_count: coverage.scannedFiles.length,
     routes_detected: coverage.detectedRoutes.length,
     apis_detected: coverage.detectedApis.length,
@@ -134,6 +133,8 @@ export async function runScannerEval(args: {
     unresolved_rate: unresolvedRate(coverage),
     scanner_error_count: scannerError ? 1 : 0,
     top_unresolved_patterns: patternCounts,
+    file_role_counts: coverage.fileRoleCounts ?? {},
+    resolution_level_distribution: normalizedResolutionCounts(coverage),
     suggested_overrides: suggestions,
     output_dir: outputDir,
     report_path: reportPath,
@@ -177,6 +178,18 @@ function renderScannerEvalMarkdown(args: {
     `- Resolved callsites: ${args.result.resolved_callsites}`,
     `- Unresolved callsites: ${args.result.unresolved_callsites}`,
     `- Unresolved rate: ${formatPercent(args.result.unresolved_rate)}`,
+    "",
+    "## File role counts",
+    ...listOrNone(
+      Object.entries(args.result.file_role_counts)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([role, count]) => `- ${role}: ${count}`),
+    ),
+    "",
+    "## Resolution level distribution",
+    ...Object.entries(args.result.resolution_level_distribution).map(
+      ([level, count]) => `- ${level}: ${count}`,
+    ),
     "",
     "## Detected routes",
     ...listOrNone(
@@ -265,7 +278,18 @@ function emptyCoverage(): ScannerCoverage {
       low: 0,
       unresolved: 0,
     },
+    fileRoleCounts: {},
+    resolutionLevelCounts: {},
     limitations: [],
+  };
+}
+
+function normalizedResolutionCounts(
+  coverage: ScannerCoverage,
+): ResolutionLevelCounts {
+  return {
+    ...emptyResolutionLevelCounts(),
+    ...coverage.resolutionLevelCounts,
   };
 }
 

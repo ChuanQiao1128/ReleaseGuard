@@ -8,11 +8,19 @@ export const confidenceLevelSchema = z.enum([
 ]);
 export type ConfidenceLevel = z.infer<typeof confidenceLevelSchema>;
 
-export const capabilityNodeTypeSchema = z.enum(["file", "route", "api", "test"]);
+export const capabilityNodeTypeSchema = z.enum([
+  "file",
+  "module",
+  "package",
+  "route",
+  "api",
+  "test",
+]);
 export type CapabilityNodeType = z.infer<typeof capabilityNodeTypeSchema>;
 
 export const capabilityEdgeTypeSchema = z.enum([
   "defines",
+  "belongs_to",
   "consumes",
   "tested_by",
 ]);
@@ -83,4 +91,3 @@ export const capabilityGraphSchema = z
   })
   .strict();
 export type CapabilityGraph = z.infer<typeof capabilityGraphSchema>;
-

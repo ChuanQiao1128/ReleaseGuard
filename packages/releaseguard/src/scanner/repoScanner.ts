@@ -10,16 +10,14 @@ import { scanNextApis } from "./nextApiScanner";
 import { scanNextRoutes } from "./nextRouteScanner";
 import { scanTests } from "./testScanner";
 import { ScannerCoverage, ScannerResult } from "./types";
+import { scanPackageManifests } from "./packageManifestScanner";
+import { scanUniversalFiles } from "./universalFileScanner";
 
 export async function scanRepository(rootDir: string): Promise<{
   graph: CapabilityGraph;
   result: ScannerResult;
 }> {
   const framework = await detectFramework(rootDir);
-  if (!framework.isNextAppRouter || !framework.isTypeScript) {
-    throw new Error("v0.1 scanner only supports the demo Next.js TypeScript app.");
-  }
-
   const graph = createCapabilityGraph(rootDir);
   const coverage: ScannerCoverage = {
     scannedFiles: [],
@@ -33,20 +31,49 @@ export async function scanRepository(rootDir: string): Promise<{
       low: 0,
       unresolved: 0,
     },
+    fileRoleCounts: {},
+    resolutionLevelCounts: {},
     limitations: [
       "v0.4 resolves direct fetch string literals, flat endpoint constants, and simple local fetcher/SWR literals.",
       "Template literals, axios wrappers, tRPC, GraphQL, generated clients, OpenAPI clients, and complex dynamic URLs are unresolved.",
-      "Monorepos and workspace graph traversal are outside v0.1 scope.",
+      "v0.5 always builds universal file/module/package fallback context before framework-specific scanning.",
+      "Monorepos and deep workspace graph traversal are outside current scanner scope.",
       "v0.1 selects direct API tests only; transitive route evidence is reported as a limitation.",
     ],
   };
 
+  await scanUniversalFiles(rootDir, graph, coverage);
+  await scanPackageManifests(rootDir, graph, coverage);
+
+  if (!framework.isNextAppRouter || !framework.isTypeScript) {
+    coverage.limitations.push(
+      "Framework-specific route/API scanner did not run; universal file/module/package fallback is the current precision level.",
+    );
+    updateConfidenceBreakdown(graph, coverage);
+    const { graphPath, coveragePath } = await writeScannerArtifacts(
+      rootDir,
+      graph,
+      coverage,
+    );
+    return {
+      graph,
+      result: {
+        graphPath,
+        coveragePath,
+        coverage,
+      },
+    };
+  }
+
   const scanned = await listFiles(framework.appRoot, (filePath) =>
     /\.(ts|tsx)$/.test(filePath),
   );
-  coverage.scannedFiles = scanned.map((filePath) =>
-    toRepoRelativePath(rootDir, filePath),
-  );
+  coverage.scannedFiles = [
+    ...new Set([
+      ...coverage.scannedFiles,
+      ...scanned.map((filePath) => toRepoRelativePath(rootDir, filePath)),
+    ]),
+  ].sort();
 
   const routes = await scanNextRoutes(rootDir, framework.appDir, graph, coverage);
   const apis = await scanNextApis(rootDir, framework.appDir, graph, coverage);
@@ -55,12 +82,11 @@ export async function scanRepository(rootDir: string): Promise<{
 
   updateConfidenceBreakdown(graph, coverage);
 
-  const releaseguardDir = path.join(rootDir, ".releaseguard");
-  await fs.mkdir(releaseguardDir, { recursive: true });
-  const graphPath = path.join(releaseguardDir, "capability_graph.json");
-  const coveragePath = path.join(releaseguardDir, "coverage_report.md");
-  await fs.writeFile(graphPath, `${JSON.stringify(graph, null, 2)}\n`);
-  await fs.writeFile(coveragePath, renderCoverageReport(coverage));
+  const { graphPath, coveragePath } = await writeScannerArtifacts(
+    rootDir,
+    graph,
+    coverage,
+  );
 
   return {
     graph,
@@ -72,15 +98,53 @@ export async function scanRepository(rootDir: string): Promise<{
   };
 }
 
+async function writeScannerArtifacts(
+  rootDir: string,
+  graph: CapabilityGraph,
+  coverage: ScannerCoverage,
+): Promise<{ graphPath: string; coveragePath: string }> {
+  const releaseguardDir = path.join(rootDir, ".releaseguard");
+  await fs.mkdir(releaseguardDir, { recursive: true });
+  const graphPath = path.join(releaseguardDir, "capability_graph.json");
+  const coveragePath = path.join(releaseguardDir, "coverage_report.md");
+  await fs.writeFile(graphPath, `${JSON.stringify(graph, null, 2)}\n`);
+  await fs.writeFile(coveragePath, renderCoverageReport(coverage));
+  return { graphPath, coveragePath };
+}
+
 function updateConfidenceBreakdown(
   graph: CapabilityGraph,
   coverage: ScannerCoverage,
 ): void {
+  let frameworkCapabilities = 0;
+  let testEvidence = 0;
+  let declaredEvidence = 0;
   for (const node of Object.values(graph.nodes)) {
     coverage.confidenceBreakdown[node.confidence] += 1;
+    if (node.type === "route" || node.type === "api") {
+      frameworkCapabilities += 1;
+    }
+    if (node.type === "test") {
+      testEvidence += 1;
+      if (node.metadata.evidenceDeclaration === true) {
+        declaredEvidence += 1;
+      }
+    }
   }
   for (const edge of Object.values(graph.edges)) {
     coverage.confidenceBreakdown[edge.confidence] += 1;
   }
   coverage.confidenceBreakdown.unresolved += coverage.unresolvedCallsites.length;
+  coverage.resolutionLevelCounts = {
+    ...coverage.resolutionLevelCounts,
+    L3_FRAMEWORK_CAPABILITY_MAPPED:
+      (coverage.resolutionLevelCounts?.L3_FRAMEWORK_CAPABILITY_MAPPED ?? 0) +
+      frameworkCapabilities,
+    L4_TEST_EVIDENCE_MAPPED:
+      (coverage.resolutionLevelCounts?.L4_TEST_EVIDENCE_MAPPED ?? 0) +
+      testEvidence,
+    L5_DECLARED_CAPABILITY_MAPPED:
+      (coverage.resolutionLevelCounts?.L5_DECLARED_CAPABILITY_MAPPED ?? 0) +
+      declaredEvidence,
+  };
 }

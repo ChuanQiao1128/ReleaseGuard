@@ -16,6 +16,7 @@ export function decide(input: {
   executionResult: EvidenceExecutionResult;
   infrastructureFailed?: boolean;
   unmappedSourceChange?: boolean;
+  unresolvedImpactReason?: string;
   docsOnly?: boolean;
 }): DecisionResult {
   if (
@@ -52,10 +53,12 @@ export function decide(input: {
     };
   }
 
-  if (input.unmappedSourceChange) {
+  if (input.unmappedSourceChange || input.unresolvedImpactReason) {
     return {
       decision: "WARN",
-      reason: "source change could not be mapped to known capability.",
+      reason:
+        input.unresolvedImpactReason ??
+        "source change could not be mapped to known capability.",
     };
   }
 

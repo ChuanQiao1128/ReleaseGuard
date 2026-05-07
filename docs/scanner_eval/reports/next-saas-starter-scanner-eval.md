@@ -18,6 +18,23 @@ Snapshot commit: `6e33e58`
 | Unresolved callsites | 0 |
 | Unresolved rate | 0.0% |
 
+## File Role Counts
+
+- `config`: 4
+- `dependency`: 1
+- `docs`: 1
+- `source`: 40
+- `unknown`: 9
+
+## Resolution Level Distribution
+
+- `L0_CHANGED_FILE_ONLY`: 55
+- `L1_MODULE_MAPPED`: 1
+- `L2_CONTRACT_MAPPED`: 0
+- `L3_FRAMEWORK_CAPABILITY_MAPPED`: 12
+- `L4_TEST_EVIDENCE_MAPPED`: 0
+- `L5_DECLARED_CAPABILITY_MAPPED`: 0
+
 ## Detected Routes
 
 - `route_dashboard_activity`: `/dashboard/activity`

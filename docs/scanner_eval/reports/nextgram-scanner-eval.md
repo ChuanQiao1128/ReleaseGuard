@@ -18,6 +18,22 @@ Snapshot commit: `e74b346`
 | Unresolved callsites | 0 |
 | Unresolved rate | 0.0% |
 
+## File Role Counts
+
+- `config`: 2
+- `docs`: 1
+- `source`: 7
+- `unknown`: 3
+
+## Resolution Level Distribution
+
+- `L0_CHANGED_FILE_ONLY`: 13
+- `L1_MODULE_MAPPED`: 1
+- `L2_CONTRACT_MAPPED`: 0
+- `L3_FRAMEWORK_CAPABILITY_MAPPED`: 3
+- `L4_TEST_EVIDENCE_MAPPED`: 0
+- `L5_DECLARED_CAPABILITY_MAPPED`: 0
+
 ## Detected Routes
 
 - `route_modal_id`: `/@modal/[id]`
@@ -49,4 +65,3 @@ Snapshot commit: `e74b346`
 This repo is useful as a route-only App Router smoke test. It validates route
 detection but does not exercise API route or frontend-to-API dependency
 coverage.
-

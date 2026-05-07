@@ -336,6 +336,33 @@ Evidence declarations are graph-validated. They can make test coverage more
 explicit, but they do not let tests invent capability IDs and they do not let
 agents or RAG change `PASS` / `WARN` / `BLOCK`.
 
+## v0.5 Universal Impact Layer
+
+ReleaseGuard is language-agnostic at the diff, file, module/package, evidence,
+and decision layers. Framework adapters improve precision where available.
+
+v0.5 adds a universal fallback before framework-specific scanners:
+
+```text
+git diff -> file role -> module/package boundary -> framework adapter -> evidence -> decision
+```
+
+Resolution levels:
+
+- `L0_CHANGED_FILE_ONLY`
+- `L1_MODULE_MAPPED`
+- `L2_CONTRACT_MAPPED`
+- `L3_FRAMEWORK_CAPABILITY_MAPPED`
+- `L4_TEST_EVIDENCE_MAPPED`
+- `L5_DECLARED_CAPABILITY_MAPPED`
+
+Unsupported repositories no longer only report `unsupported_framework`. Scanner
+eval still marks route/API precision as unsupported, but it also reports file
+role counts and module/package fallback context. Unknown source, config, or
+dependency changes do not silently pass; they fail safe with `WARN` unless a
+more precise adapter, coverage source, declaration, or override can prove the
+impact.
+
 ## Day 1 demo app
 
 The v0.1 demo app lives in `apps/demo-app`.
