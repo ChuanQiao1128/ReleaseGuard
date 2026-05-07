@@ -65,6 +65,17 @@ describe("Repo Memory eval, benchmark, and demo reports", () => {
       (entry) => entry.retriever === "guarded_rrf_hybrid",
     );
     expect(guarded?.metrics.no_answer_abstention_rate).toBeGreaterThan(0);
+    expect(guarded?.metrics.false_abstention_count).toBeGreaterThanOrEqual(0);
+    expect(result.guarded_thresholds_used).toMatchObject({
+      bm25MinTopScore: expect.any(Number),
+      minQueryTokenOverlap: expect.any(Number),
+      minQueryTokenOverlapRatio: expect.any(Number),
+      embeddingMinTopScore: expect.any(Number),
+      sharedTopRankLimit: expect.any(Number),
+    });
+    expect(
+      result.abstention_examples.no_answer_correct_abstentions.length,
+    ).toBeGreaterThan(0);
     expect(result.citation_validation_eval).toMatchObject({
       valid_retrieved_citation_passed: true,
       nonexistent_chunk_rejected: true,
@@ -86,6 +97,13 @@ describe("Repo Memory eval, benchmark, and demo reports", () => {
     expect(markdown).toContain(
       "No-answer handling is required before RAG context can safely influence evidence priority",
     );
+    expect(markdown).toContain("## Guarded Retriever Calibration");
+    expect(markdown).toContain("False abstention count");
+    expect(markdown).toContain("### Thresholds Used");
+    expect(markdown).toContain("BM25 minimum top score");
+    expect(markdown).toContain("RRF guard rule");
+    expect(markdown).toContain("No-answer queries correctly abstained");
+    expect(markdown).toContain("Answerable queries incorrectly abstained");
     expect(markdown).toContain("Citation Validation Eval");
     expect(markdown).toContain("Limitations");
     expect(markdown).toContain(

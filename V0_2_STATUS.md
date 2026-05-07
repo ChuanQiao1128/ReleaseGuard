@@ -426,3 +426,61 @@ Limitations:
 Next:
 - v0.3 may use trusted RAG context to raise evidence priority, but v0.2.2 stops
   before any RAG-informed evidence planning or merge decision changes.
+
+## v0.2.3 RAG Abstention Calibration and Reporting
+
+Status: Done
+
+Done:
+- Added false abstention count/rate to guarded retrieval benchmark metrics.
+- Added guarded retriever abstention examples to the benchmark report:
+  - no-answer queries correctly abstained,
+  - answerable queries incorrectly abstained.
+- Added guarded retrieval thresholds to the benchmark report.
+- README now explains the abstention tradeoff and why it matters before v0.3.
+- Kept existing thresholds unchanged; no-answer FPR remains `0.000` for guarded
+  RRF hybrid.
+
+Tests run:
+- `npm run test --workspace releaseguard -- --run tests/memoryRetrievers.test.ts tests/memoryEvalBenchmark.test.ts`
+- `npm run build --workspace releaseguard`
+- `npm run releaseguard -- memory benchmark`
+- `npm run test --workspace releaseguard`
+- `npm run releaseguard -- memory index`
+- `npm run releaseguard -- memory demo-discount-context`
+- `npm test`
+- `npm run build --workspace @releaseguard/demo-app`
+- `npm run releaseguard:selfcheck`
+- `npm run test --workspace @releaseguard/demo-app`
+
+Benchmark output so far:
+- Chunks: 46
+- Queries: 18
+- No-answer queries: 5
+- Guarded RRF hybrid:
+  - Recall@5 `0.846`
+  - MRR `0.364`
+  - no-answer FPR `0.000`
+  - no-answer abstention `1.000`
+  - false abstention count `2`
+  - false abstention rate `0.154`
+
+Abstention examples:
+- Correct no-answer abstentions:
+  - `How do we handle WebSocket reconnection?`
+  - `What is the Redis cache eviction policy?`
+  - `How are payment provider secrets rotated?`
+  - `What is the mobile push notification retry policy?`
+  - `What is the feature flag rollout strategy?`
+- False abstentions:
+  - `historical checkout risk after invalid discount validation changes`
+  - `which repo memory says checkout is a critical revenue path`
+
+Limitations:
+- v0.2.3 reports abstention tradeoffs but does not tune thresholds.
+- v0.2.3 remains report-only and does not affect Evidence Planner or
+  PASS/WARN/BLOCK decisions.
+
+Next:
+- v0.3 may use trusted RAG context to raise evidence priority, but v0.2.3 stops
+  before any RAG-informed evidence planning or merge decision changes.

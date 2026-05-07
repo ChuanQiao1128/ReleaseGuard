@@ -11,6 +11,7 @@ import { fuseWithRrf, RRF_K } from "../src/memory/rrfRetriever";
 import { applyTemporalDecay } from "../src/memory/temporalDecay";
 import { writeRepoMemoryIndex } from "../src/memory/memoryIndex";
 import { RepoMemoryChunk } from "../src/memory/types";
+import { computeMetrics } from "../src/memory/benchmark";
 
 const repoRoot = path.resolve(process.cwd(), "../..");
 
@@ -216,6 +217,44 @@ describe("Repo Memory retrievers", () => {
       decision: "NO_RELEVANT_CONTEXT",
       results: [],
     });
+  });
+
+  it("counts false abstention for answerable queries", () => {
+    const metrics = computeMetrics(
+      [
+        {
+          query_id: "answerable",
+          query: "discount checkout",
+          gold_chunk_ids: ["gold"],
+          reviewed: false,
+          query_type: "direct",
+        },
+      ],
+      new Map([["answerable", []]]),
+      new Map([["answerable", "NO_RELEVANT_CONTEXT"]]),
+    );
+
+    expect(metrics.false_abstention_count).toBe(1);
+    expect(metrics.false_abstention_rate).toBe(1);
+  });
+
+  it("counts correct no-answer abstention", () => {
+    const metrics = computeMetrics(
+      [
+        {
+          query_id: "no-answer",
+          query: "websocket policy",
+          gold_chunk_ids: [],
+          reviewed: false,
+          query_type: "no_answer",
+        },
+      ],
+      new Map([["no-answer", []]]),
+      new Map([["no-answer", "NO_RELEVANT_CONTEXT"]]),
+    );
+
+    expect(metrics.no_answer_abstention_rate).toBe(1);
+    expect(metrics.no_answer_false_positive_rate).toBe(0);
   });
 });
 

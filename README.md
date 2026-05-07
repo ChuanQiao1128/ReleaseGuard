@@ -179,6 +179,12 @@ force context onto no-answer queries, so the guarded retriever can return
 v0.3 because no-answer handling is required before RAG context can safely
 influence evidence priority.
 
+v0.2.3 makes the abstention tradeoff explicit. In the current demo benchmark,
+guarded RRF correctly abstains on all 5 no-answer queries and false-abstains on
+2 of 13 answerable queries (`false_abstention_rate=0.154`). The report lists
+those query examples and the thresholds used by the guard so future tuning can
+reduce recall loss without hiding no-answer failures.
+
 Try guarded memory search:
 
 ```bash

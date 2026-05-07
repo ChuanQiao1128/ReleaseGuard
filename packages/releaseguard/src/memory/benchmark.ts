@@ -8,7 +8,12 @@ import {
   RagEvalQueryType,
   writeRagEvalDataset,
 } from "./evalDataset";
-import { guardedRetrieveWithRrf, RetrievalDecision } from "./guardedRetriever";
+import {
+  DEFAULT_GUARDED_RETRIEVAL_THRESHOLDS,
+  GuardedRetrievalThresholds,
+  guardedRetrieveWithRrf,
+  RetrievalDecision,
+} from "./guardedRetriever";
 import { writeRepoMemoryIndex } from "./memoryIndex";
 import { validateRepoMemoryCitation } from "./memoryCitationValidator";
 import { MemoryRetrievalResult } from "./retrieverTypes";
@@ -26,6 +31,7 @@ export type RetrieverMetrics = {
   mrr: number;
   answerable_query_count: number;
   no_answer_query_count: number;
+  false_abstention_count: number;
   no_answer_false_positive_rate: number;
   no_answer_abstention_rate: number;
   false_abstention_rate: number;
@@ -44,8 +50,23 @@ export type RagBenchmarkRun = {
   markdown_report_path: string;
   json_report_path: string;
   results: RetrieverBenchmarkResult[];
+  guarded_thresholds_used: GuardedRetrievalThresholds;
+  abstention_examples: AbstentionExamples;
   citation_validation_eval: CitationValidationEval;
   limitations: string[];
+};
+
+export type AbstentionExample = {
+  query_id: string;
+  query: string;
+  query_type: RagEvalQueryType;
+  gold_chunk_ids: string[];
+  reason: string;
+};
+
+export type AbstentionExamples = {
+  no_answer_correct_abstentions: AbstentionExample[];
+  answerable_false_abstentions: AbstentionExample[];
 };
 
 export type CitationValidationEval = {
@@ -89,6 +110,8 @@ export async function runRagBenchmark(
     markdown_report_path: markdownReportPath,
     json_report_path: jsonReportPath,
     results,
+    guarded_thresholds_used: DEFAULT_GUARDED_RETRIEVAL_THRESHOLDS,
+    abstention_examples: abstentionExamples(dataset.items, runs),
     citation_validation_eval: runCitationValidationEval(index.chunks, runs),
     limitations,
   };
@@ -240,11 +263,13 @@ export function computeMetrics(
   const noAnswer = items.filter((item) => item.gold_chunk_ids.length === 0);
   let recalled = 0;
   let reciprocalRankSum = 0;
+  let answerableAbstained = 0;
 
   for (const item of answerable) {
     const results = resultsByQueryId.get(item.query_id) ?? [];
     const abstained = didAbstain(item.query_id, results, decisionsByQueryId);
     if (abstained) {
+      answerableAbstained += 1;
       continue;
     }
     const firstGoldIndex = results.findIndex((result) =>
@@ -268,19 +293,12 @@ export function computeMetrics(
     }
   }
 
-  let answerableAbstained = 0;
-  for (const item of answerable) {
-    const results = resultsByQueryId.get(item.query_id) ?? [];
-    if (didAbstain(item.query_id, results, decisionsByQueryId)) {
-      answerableAbstained += 1;
-    }
-  }
-
   return {
     recall_at_5: answerable.length === 0 ? 0 : recalled / answerable.length,
     mrr: answerable.length === 0 ? 0 : reciprocalRankSum / answerable.length,
     answerable_query_count: answerable.length,
     no_answer_query_count: noAnswer.length,
+    false_abstention_count: answerableAbstained,
     no_answer_false_positive_rate:
       noAnswer.length === 0 ? 0 : falsePositive / noAnswer.length,
     no_answer_abstention_rate:
@@ -307,6 +325,44 @@ function benchmarkLimitations(
     );
   }
   return limitations;
+}
+
+function abstentionExamples(
+  items: RagEvalItem[],
+  runs: RetrieverRun[],
+): AbstentionExamples {
+  const guardedRun = runs.find((run) => run.name === "guarded_rrf_hybrid");
+  if (!guardedRun?.decisionsByQueryId) {
+    return {
+      no_answer_correct_abstentions: [],
+      answerable_false_abstentions: [],
+    };
+  }
+  const examples = items
+    .filter(
+      (item) =>
+        guardedRun.decisionsByQueryId?.get(item.query_id) ===
+        "NO_RELEVANT_CONTEXT",
+    )
+    .map((item) => ({
+      query_id: item.query_id,
+      query: item.query,
+      query_type: item.query_type,
+      gold_chunk_ids: item.gold_chunk_ids,
+      reason:
+        item.gold_chunk_ids.length === 0
+          ? "correct no-answer abstention"
+          : "false abstention on answerable query",
+    }));
+
+  return {
+    no_answer_correct_abstentions: examples
+      .filter((item) => item.gold_chunk_ids.length === 0)
+      .slice(0, 5),
+    answerable_false_abstentions: examples
+      .filter((item) => item.gold_chunk_ids.length > 0)
+      .slice(0, 5),
+  };
 }
 
 function renderBenchmarkMarkdown(report: RagBenchmarkRun, rootDir: string): string {
@@ -349,6 +405,33 @@ function renderBenchmarkMarkdown(report: RagBenchmarkRun, rootDir: string): stri
     "",
     "No-answer handling is required before RAG context can safely influence evidence priority.",
     "",
+    "## Guarded Retriever Calibration",
+    "",
+    `False abstention count: ${guardedMetrics(report)?.false_abstention_count ?? 0}`,
+    `False abstention rate: ${formatMetric(guardedMetrics(report)?.false_abstention_rate ?? 0)}`,
+    "",
+    "### Thresholds Used",
+    "",
+    `- BM25 minimum top score: ${report.guarded_thresholds_used.bm25MinTopScore}`,
+    `- Minimum meaningful query-token overlap: ${report.guarded_thresholds_used.minQueryTokenOverlap}`,
+    `- Minimum meaningful query-token overlap ratio: ${formatMetric(report.guarded_thresholds_used.minQueryTokenOverlapRatio)}`,
+    `- Embedding minimum top score: ${report.guarded_thresholds_used.embeddingMinTopScore}`,
+    `- Shared top-rank limit for BM25/RRF support: ${report.guarded_thresholds_used.sharedTopRankLimit}`,
+    `- RRF guard rule: require positive BM25 lexical signal before returning hybrid context.`,
+    `- Metadata support rule: metadata-supported embedding context can support HAS_RELEVANT_CONTEXT only after the lexical guard passes.`,
+    "",
+    "### Abstention Examples",
+    "",
+    "No-answer queries correctly abstained:",
+    ...formatAbstentionExamples(
+      report.abstention_examples.no_answer_correct_abstentions,
+    ),
+    "",
+    "Answerable queries incorrectly abstained:",
+    ...formatAbstentionExamples(
+      report.abstention_examples.answerable_false_abstentions,
+    ),
+    "",
     "## Citation Validation Eval",
     "",
     "| Check | Passed |",
@@ -375,6 +458,24 @@ function didAbstain(
     return decision === "NO_RELEVANT_CONTEXT";
   }
   return results.length === 0 || !results.some((result) => result.score > 0);
+}
+
+function guardedMetrics(report: RagBenchmarkRun): RetrieverMetrics | undefined {
+  return report.results.find(
+    (result) => result.retriever === "guarded_rrf_hybrid",
+  )?.metrics;
+}
+
+function formatAbstentionExamples(examples: AbstentionExample[]): string[] {
+  if (examples.length === 0) {
+    return ["- None"];
+  }
+  return examples.map((example) => {
+    const gold = example.gold_chunk_ids.length > 0
+      ? ` gold=${example.gold_chunk_ids.join(",")}`
+      : "";
+    return `- ${example.query_id}: ${example.query}${gold}`;
+  });
 }
 
 function queryTypeCounts(
