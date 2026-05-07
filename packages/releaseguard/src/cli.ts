@@ -291,10 +291,15 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     .relative(rootDir, result.reportPath)
     .split(path.sep)
     .join("/");
+  const htmlReport = path
+    .relative(rootDir, result.htmlReportPath)
+    .split(path.sep)
+    .join("/");
 
   console.log(`Decision: ${result.decision.decision}`);
   console.log(`Reason: ${result.decision.reason}`);
   console.log(`Report: ${report}`);
+  console.log(`HTML Report: ${htmlReport}`);
 
   assertExpectedDecision(result.decision.decision, args.expectDecision);
 }

@@ -8,7 +8,7 @@ import { EvidenceExecutionResult } from "../executor/selectedTestExecutor";
 import { CapabilityGraph } from "../graph/types";
 import { HistoricalRiskContext } from "../memory/historicalRiskContext";
 
-export function renderMarkdownReport(input: {
+export type ReleaseGuardReportInput = {
   graph: CapabilityGraph;
   scope: ChangeScope;
   impact: ChangeImpactAgentOutput;
@@ -20,7 +20,9 @@ export function renderMarkdownReport(input: {
   coveragePath?: string;
   coverageReport?: CoverageReport;
   artifactDir: string;
-}): string {
+};
+
+export function renderMarkdownReport(input: ReleaseGuardReportInput): string {
   const rel = (filePath: string) =>
     path.relative(input.graph.rootDir, filePath).split(path.sep).join("/");
 

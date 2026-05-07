@@ -81,6 +81,17 @@ Report: artifacts/releaseguard/<run_id>/report.md
 
 That fixture simulates a README-only change. ReleaseGuard classifies the scope before scanning, fast-skips capability/evidence/test work, and writes a PASS report.
 
+## Reports
+
+Each ReleaseGuard run writes a reviewer-facing report artifact:
+
+```text
+artifacts/releaseguard/<run_id>/report.md
+artifacts/releaseguard/<run_id>/report.html
+```
+
+The Markdown report is optimized for CLI and GitHub Actions artifacts. The HTML report is a static file with the same merge-safety content: decision, changed files, affected capabilities, selected evidence, missing evidence, historical risk context, coverage evidence, scanner coverage, and artifact links. It is not a dashboard and does not change `PASS` / `WARN` / `BLOCK` semantics.
+
 ## v0.1 support
 
 ReleaseGuard v0.1 is a narrow vertical slice for the demo app only.
@@ -96,7 +107,7 @@ It supports:
 - Citation validation for known graph node and edge IDs.
 - Selected test execution.
 - Deterministic `PASS` / `WARN` / `BLOCK` decisions.
-- Markdown reports under `artifacts/releaseguard/<run_id>/report.md`.
+- Markdown and static HTML reports under `artifacts/releaseguard/<run_id>/`.
 - Fixture demos for `BLOCK`, `WARN`, and `PASS`.
 - Real git diff mode using changed file paths from `git diff`.
 - GitHub Actions fixture self-checks and non-blocking real diff preview.
@@ -456,7 +467,7 @@ npm pack
 Install the tarball in another repository:
 
 ```bash
-npm install --save-dev /path/to/releaseguard-0.7.1.tgz
+npm install --save-dev /path/to/releaseguard-0.7.2.tgz
 npx releaseguard scanner eval --repo-root .
 ```
 

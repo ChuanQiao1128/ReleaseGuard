@@ -45,7 +45,7 @@ npm pack
 Install in another repository:
 
 ```bash
-npm install --save-dev /path/to/releaseguard-0.7.1.tgz
+npm install --save-dev /path/to/releaseguard-0.7.2.tgz
 npx releaseguard scanner eval --repo-root .
 ```
 
@@ -60,6 +60,27 @@ Done:
 - Confirmed the package name remains `releaseguard`.
 - Confirmed the CLI bin remains:
   - `releaseguard -> dist/cli.js`
+
+## v0.7.2 HTML Report
+
+Done:
+
+- Added a static HTML report artifact next to the existing Markdown report:
+  - `artifacts/releaseguard/<run_id>/report.html`
+- Kept `report.md` as the primary CLI/GitHub Actions artifact.
+- Updated run mode so docs-only and full analysis runs both write HTML.
+- Updated CLI output to print both report paths.
+- Added tests for HTML report rendering and artifact generation.
+- Hardened run artifact IDs with a short UUID suffix so concurrent runs do not
+  overwrite each other's reports.
+- Updated package metadata for the local tarball:
+  - `releaseguard-0.7.2.tgz`
+
+Limits:
+
+- This is a static report artifact, not a dashboard.
+- It does not add PR comments, GitHub App behavior, or hosted UI.
+- It does not change `PASS` / `WARN` / `BLOCK` semantics.
 
 ## Limits
 
@@ -100,7 +121,7 @@ Final verification result: passed.
 Package output:
 
 ```text
-releaseguard-0.7.1.tgz
+releaseguard-0.7.2.tgz
 ```
 
 External smoke result:

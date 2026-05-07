@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { DeterministicChangeImpactAgent } from "./agents/changeImpactAgent";
@@ -22,6 +23,8 @@ import {
   HistoricalRiskContext,
   resolveHistoricalRiskContexts,
 } from "./memory/historicalRiskContext";
+import { renderHtmlReport } from "./report/htmlReport";
+import type { ReleaseGuardReportInput } from "./report/markdownReport";
 import { renderMarkdownReport } from "./report/markdownReport";
 import { scanRepository } from "./scanner/repoScanner";
 
@@ -36,6 +39,7 @@ export type RunReleaseGuardOptions = {
 export type RunReleaseGuardResult = {
   decision: DecisionResult;
   reportPath: string;
+  htmlReportPath: string;
   artifactDir: string;
   graph: CapabilityGraph;
   impact: ChangeImpactAgentOutput;
@@ -56,9 +60,9 @@ export async function runReleaseGuard(
   });
 
   return runReleaseGuardWithScope({
-      rootDir,
-      scope,
-      coverageFile: options.coverageFile,
+    rootDir,
+    scope,
+    coverageFile: options.coverageFile,
   });
 }
 
@@ -85,24 +89,21 @@ export async function runReleaseGuardWithScope(options: {
       executionResult,
       docsOnly: true,
     });
-    const reportPath = path.join(artifactDir, "report.md");
-    await fs.writeFile(
-      reportPath,
-      renderMarkdownReport({
-        graph,
-        scope,
-        impact,
-        evidencePlan,
-        executionResult,
-        decision,
-        historicalRiskContexts,
-        artifactDir,
-      }),
-    );
+    const { reportPath, htmlReportPath } = await writeRunReports({
+      graph,
+      scope,
+      impact,
+      evidencePlan,
+      executionResult,
+      decision,
+      historicalRiskContexts,
+      artifactDir,
+    });
 
     return {
       decision,
       reportPath,
+      htmlReportPath,
       artifactDir,
       graph,
       impact,
@@ -196,27 +197,24 @@ export async function runReleaseGuardWithScope(options: {
           !scope.docsOnly),
     });
 
-    const reportPath = path.join(artifactDir, "report.md");
-    await fs.writeFile(
-      reportPath,
-      renderMarkdownReport({
-        graph,
-        scope,
-        impact,
-        evidencePlan,
-        executionResult,
-        decision,
-        historicalRiskContexts,
-        graphPath: scannerResult.graphPath,
-        coveragePath: scannerResult.coveragePath,
-        coverageReport,
-        artifactDir,
-      }),
-    );
+    const { reportPath, htmlReportPath } = await writeRunReports({
+      graph,
+      scope,
+      impact,
+      evidencePlan,
+      executionResult,
+      decision,
+      historicalRiskContexts,
+      graphPath: scannerResult.graphPath,
+      coveragePath: scannerResult.coveragePath,
+      coverageReport,
+      artifactDir,
+    });
 
     return {
       decision,
       reportPath,
+      htmlReportPath,
       artifactDir,
       graph,
       impact,
@@ -227,6 +225,14 @@ export async function runReleaseGuardWithScope(options: {
   } finally {
     await preScanFixtureRestore?.restore();
   }
+}
+
+async function writeRunReports(input: ReleaseGuardReportInput) {
+  const reportPath = path.join(input.artifactDir, "report.md");
+  const htmlReportPath = path.join(input.artifactDir, "report.html");
+  await fs.writeFile(reportPath, renderMarkdownReport(input));
+  await fs.writeFile(htmlReportPath, renderHtmlReport(input));
+  return { reportPath, htmlReportPath };
 }
 
 function isUnmappedSourceChange(
@@ -242,10 +248,11 @@ function isUnmappedSourceChange(
 }
 
 function createRunId(): string {
-  return new Date()
+  const timestamp = new Date()
     .toISOString()
     .replace(/[-:]/g, "")
     .replace(".", "");
+  return `${timestamp}-${randomUUID().slice(0, 8)}`;
 }
 
 function createEmptyRunGraph(rootDir: string): CapabilityGraph {
