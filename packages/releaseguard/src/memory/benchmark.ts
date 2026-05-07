@@ -24,7 +24,8 @@ export type RetrieverBenchmarkName =
   | "bm25"
   | "embedding"
   | "rrf_hybrid"
-  | "guarded_rrf_hybrid";
+  | "guarded_rrf_hybrid"
+  | "capability_guarded_rrf_hybrid";
 
 export type RetrieverMetrics = {
   recall_at_5: number;
@@ -211,6 +212,8 @@ async function runRetrievers(
   const hybrid = new Map<string, MemoryRetrievalResult[]>();
   const guarded = new Map<string, MemoryRetrievalResult[]>();
   const guardedDecisions = new Map<string, RetrievalDecision>();
+  const capabilityGuarded = new Map<string, MemoryRetrievalResult[]>();
+  const capabilityGuardedDecisions = new Map<string, RetrievalDecision>();
 
   for (const item of items) {
     const bm25Results = retrieveWithBm25({
@@ -240,6 +243,17 @@ async function runRetrievers(
     });
     guarded.set(item.query_id, guardedResult.results);
     guardedDecisions.set(item.query_id, guardedResult.decision);
+    const capabilityGuardedResult = await guardedRetrieveWithRrf({
+      chunks,
+      query: item.query,
+      limit: 5,
+      capabilityIds: capabilityIdsForEvalItem(item, chunks),
+    });
+    capabilityGuarded.set(item.query_id, capabilityGuardedResult.results);
+    capabilityGuardedDecisions.set(
+      item.query_id,
+      capabilityGuardedResult.decision,
+    );
   }
 
   return [
@@ -250,6 +264,11 @@ async function runRetrievers(
       name: "guarded_rrf_hybrid",
       resultsByQueryId: guarded,
       decisionsByQueryId: guardedDecisions,
+    },
+    {
+      name: "capability_guarded_rrf_hybrid",
+      resultsByQueryId: capabilityGuarded,
+      decisionsByQueryId: capabilityGuardedDecisions,
     },
   ];
 }
@@ -317,6 +336,7 @@ function benchmarkLimitations(
     "v0.2 benchmark uses deterministic local template queries, not a reviewed production eval set.",
     "Embedding baseline defaults to deterministic local token hashing unless an external provider is explicitly configured later.",
     "No-answer handling is required before RAG context can safely influence evidence priority.",
+    "Capability-aware retrieval uses graph-provided capability IDs as task context; it is not generic corpus search and does not discover structured dependencies.",
     "RAG retrieval is report context only in v0.2 and does not change PASS/WARN/BLOCK decisions.",
   ];
   if (dataset.items.length < 20 || chunks.length < 30) {
@@ -403,12 +423,16 @@ function renderBenchmarkMarkdown(report: RagBenchmarkRun, rootDir: string): stri
     "",
     "Guarded RRF hybrid adds deterministic abstention. It can return NO_RELEVANT_CONTEXT for no-answer queries instead of forcing unrelated chunks into report context.",
     "",
+    "Capability-aware guarded RRF uses Capability Graph metadata to expand task-context queries and reduce false abstentions for answerable checkout/discount memory. It is still report-only and does not discover route/API/test relationships.",
+    "",
     "No-answer handling is required before RAG context can safely influence evidence priority.",
     "",
     "## Guarded Retriever Calibration",
     "",
     `False abstention count: ${guardedMetrics(report)?.false_abstention_count ?? 0}`,
     `False abstention rate: ${formatMetric(guardedMetrics(report)?.false_abstention_rate ?? 0)}`,
+    `Capability-aware false abstention count: ${capabilityAwareGuardedMetrics(report)?.false_abstention_count ?? 0}`,
+    `Capability-aware false abstention rate: ${formatMetric(capabilityAwareGuardedMetrics(report)?.false_abstention_rate ?? 0)}`,
     "",
     "### Thresholds Used",
     "",
@@ -419,6 +443,7 @@ function renderBenchmarkMarkdown(report: RagBenchmarkRun, rootDir: string): stri
     `- Shared top-rank limit for BM25/RRF support: ${report.guarded_thresholds_used.sharedTopRankLimit}`,
     `- RRF guard rule: require positive BM25 lexical signal before returning hybrid context.`,
     `- Metadata support rule: metadata-supported embedding context can support HAS_RELEVANT_CONTEXT only after the lexical guard passes.`,
+    `- Capability-aware expansion rule: only graph-tagged capability IDs add aliases to the retrieval query; no-answer benchmark queries receive no capability expansion.`,
     "",
     "### Abstention Examples",
     "",
@@ -464,6 +489,37 @@ function guardedMetrics(report: RagBenchmarkRun): RetrieverMetrics | undefined {
   return report.results.find(
     (result) => result.retriever === "guarded_rrf_hybrid",
   )?.metrics;
+}
+
+function capabilityAwareGuardedMetrics(
+  report: RagBenchmarkRun,
+): RetrieverMetrics | undefined {
+  return report.results.find(
+    (result) => result.retriever === "capability_guarded_rrf_hybrid",
+  )?.metrics;
+}
+
+function capabilityIdsForEvalItem(
+  item: RagEvalItem,
+  chunks: RepoMemoryChunk[],
+): string[] {
+  if (item.gold_chunk_ids.length === 0) {
+    return [];
+  }
+  const chunkIds = new Set([
+    item.source_chunk_id,
+    ...item.gold_chunk_ids,
+  ].filter((chunkId): chunkId is string => Boolean(chunkId)));
+  const capabilityIds = new Set<string>();
+  for (const chunk of chunks) {
+    if (!chunkIds.has(chunk.chunk_id)) {
+      continue;
+    }
+    for (const capabilityId of chunk.related_capability_ids) {
+      capabilityIds.add(capabilityId);
+    }
+  }
+  return [...capabilityIds].sort();
 }
 
 function formatAbstentionExamples(examples: AbstentionExample[]): string[] {

@@ -1,4 +1,9 @@
+import { CapabilityGraph } from "../graph/types";
 import { retrieveWithBm25 } from "./bm25Retriever";
+import {
+  CapabilityQueryExpansion,
+  expandQueryWithCapabilities,
+} from "./capabilityQueryExpansion";
 import { retrieveWithEmbeddings } from "./embeddingRetriever";
 import { MemoryRetrievalResult, MemoryRetrieverFilters } from "./retrieverTypes";
 import { fuseWithRrf } from "./rrfRetriever";
@@ -30,8 +35,9 @@ export type GuardedRetrievalResult = {
   decision: RetrievalDecision;
   reason: string;
   results: MemoryRetrievalResult[];
-  retriever: "guarded_rrf_hybrid";
+  retriever: "guarded_rrf_hybrid" | "capability_guarded_rrf_hybrid";
   thresholds_used: GuardedRetrievalThresholds;
+  query_expansion?: CapabilityQueryExpansion;
   signals: {
     bm25TopScore: number;
     embeddingTopScore: number;
@@ -48,11 +54,22 @@ export async function guardedRetrieveWithRrf(args: {
   limit?: number;
   filters?: MemoryRetrieverFilters;
   thresholds?: Partial<GuardedRetrievalThresholds>;
+  capabilityIds?: string[];
+  graph?: CapabilityGraph;
 }): Promise<GuardedRetrievalResult> {
   const thresholds = {
     ...DEFAULT_GUARDED_RETRIEVAL_THRESHOLDS,
     ...args.thresholds,
   };
+  const queryExpansion = expandQueryWithCapabilities({
+    query: args.query,
+    capabilityIds: args.capabilityIds,
+    graph: args.graph,
+  });
+  const retriever: GuardedRetrievalResult["retriever"] =
+    queryExpansion.matched_capability_ids.length > 0
+      ? "capability_guarded_rrf_hybrid"
+      : "guarded_rrf_hybrid";
   if (args.query.trim().length === 0 || args.chunks.length === 0) {
     return guardedResult({
       decision: "NO_RELEVANT_CONTEXT",
@@ -63,18 +80,55 @@ export async function guardedRetrieveWithRrf(args: {
       embeddingResults: [],
       query: args.query,
       chunks: args.chunks,
+      capabilityIds: queryExpansion.matched_capability_ids,
+      queryExpansion,
+      retriever,
     });
   }
 
+  if (queryExpansion.matched_capability_ids.length > 0) {
+    const originalQueryResult = await guardedRetrieveCore({
+      ...args,
+      retrievalQuery: args.query,
+      thresholds,
+      queryExpansion,
+      retriever,
+    });
+    if (originalQueryResult.decision !== "NO_RELEVANT_CONTEXT") {
+      return originalQueryResult;
+    }
+  }
+
+  return guardedRetrieveCore({
+    ...args,
+    retrievalQuery: queryExpansion.expanded_query,
+    thresholds,
+    queryExpansion,
+    retriever,
+  });
+}
+
+async function guardedRetrieveCore(args: {
+  chunks: RepoMemoryChunk[];
+  query: string;
+  retrievalQuery: string;
+  limit?: number;
+  filters?: MemoryRetrieverFilters;
+  thresholds: GuardedRetrievalThresholds;
+  capabilityIds?: string[];
+  graph?: CapabilityGraph;
+  queryExpansion: CapabilityQueryExpansion;
+  retriever: GuardedRetrievalResult["retriever"];
+}): Promise<GuardedRetrievalResult> {
   const bm25Results = retrieveWithBm25({
     chunks: args.chunks,
-    query: args.query,
+    query: args.retrievalQuery,
     limit: 10,
     filters: args.filters,
   });
   const embeddingResults = await retrieveWithEmbeddings({
     chunks: args.chunks,
-    query: args.query,
+    query: args.retrievalQuery,
     limit: 10,
     filters: args.filters,
   });
@@ -84,43 +138,57 @@ export async function guardedRetrieveWithRrf(args: {
     limit: args.limit ?? 5,
   }).map((result) => ({
     ...result,
-    retriever: "guarded_rrf_hybrid" as const,
+    retriever: args.retriever,
   }));
 
   const queryTokenOverlap = queryTokenOverlapSignal({
     chunks: args.chunks,
     results: bm25Results,
-    query: args.query,
+    query: args.retrievalQuery,
   });
   const bm25TopScore = bm25Results[0]?.score ?? 0;
   const embeddingTopScore = embeddingResults[0]?.score ?? 0;
   const sharedChunkInTopRanks = hasSharedTopChunk({
     bm25Results,
     embeddingResults,
-    rankLimit: thresholds.sharedTopRankLimit,
+    rankLimit: args.thresholds.sharedTopRankLimit,
   });
-  const metadataSupported = hasMetadataSupport(args.chunks, rrfResults);
+  const metadataSupported = hasMetadataSupport({
+    chunks: args.chunks,
+    results: rrfResults,
+    capabilityIds: args.queryExpansion.matched_capability_ids,
+  });
+  const capabilityMetadataSupported =
+    args.queryExpansion.matched_capability_ids.length > 0 && metadataSupported;
+  const lexicalSignalPresent =
+    bm25TopScore > args.thresholds.bm25MinTopScore &&
+    queryTokenOverlap.overlap >= args.thresholds.minQueryTokenOverlap;
 
   if (
-    bm25TopScore <= thresholds.bm25MinTopScore ||
-    queryTokenOverlap.overlap < thresholds.minQueryTokenOverlap ||
-    queryTokenOverlap.ratio <= thresholds.minQueryTokenOverlapRatio
+    !lexicalSignalPresent ||
+    (
+      queryTokenOverlap.ratio <= args.thresholds.minQueryTokenOverlapRatio &&
+      !capabilityMetadataSupported
+    )
   ) {
     return guardedResult({
       decision: "NO_RELEVANT_CONTEXT",
       reason: "no positive lexical retrieval signal",
       results: [],
-      thresholds,
+      thresholds: args.thresholds,
       bm25Results,
       embeddingResults,
-      query: args.query,
+      query: args.retrievalQuery,
       chunks: args.chunks,
+      capabilityIds: args.queryExpansion.matched_capability_ids,
+      queryExpansion: args.queryExpansion,
+      retriever: args.retriever,
     });
   }
 
   if (
     sharedChunkInTopRanks ||
-    (embeddingTopScore >= thresholds.embeddingMinTopScore && metadataSupported)
+    (embeddingTopScore >= args.thresholds.embeddingMinTopScore && metadataSupported)
   ) {
     return guardedResult({
       decision: "HAS_RELEVANT_CONTEXT",
@@ -128,11 +196,14 @@ export async function guardedRetrieveWithRrf(args: {
         ? "bm25 and embedding support overlapping chunks"
         : "positive lexical signal with metadata-supported embedding context",
       results: rrfResults,
-      thresholds,
+      thresholds: args.thresholds,
       bm25Results,
       embeddingResults,
-      query: args.query,
+      query: args.retrievalQuery,
       chunks: args.chunks,
+      capabilityIds: args.queryExpansion.matched_capability_ids,
+      queryExpansion: args.queryExpansion,
+      retriever: args.retriever,
     });
   }
 
@@ -140,11 +211,14 @@ export async function guardedRetrieveWithRrf(args: {
     decision: "LOW_CONFIDENCE_CONTEXT",
     reason: "only one weak retrieval signal is available",
     results: rrfResults.slice(0, 1),
-    thresholds,
+    thresholds: args.thresholds,
     bm25Results,
     embeddingResults,
-    query: args.query,
+    query: args.retrievalQuery,
     chunks: args.chunks,
+    capabilityIds: args.queryExpansion.matched_capability_ids,
+    queryExpansion: args.queryExpansion,
+    retriever: args.retriever,
   });
 }
 
@@ -157,6 +231,9 @@ function guardedResult(args: {
   embeddingResults: MemoryRetrievalResult[];
   query: string;
   chunks: RepoMemoryChunk[];
+  capabilityIds: string[];
+  queryExpansion: CapabilityQueryExpansion;
+  retriever: "guarded_rrf_hybrid" | "capability_guarded_rrf_hybrid";
 }): GuardedRetrievalResult {
   const overlap = queryTokenOverlapSignal({
     chunks: args.chunks,
@@ -167,8 +244,11 @@ function guardedResult(args: {
     decision: args.decision,
     reason: args.reason,
     results: args.results,
-    retriever: "guarded_rrf_hybrid",
+    retriever: args.retriever,
     thresholds_used: args.thresholds,
+    query_expansion: args.queryExpansion.matched_capability_ids.length > 0
+      ? args.queryExpansion
+      : undefined,
     signals: {
       bm25TopScore: args.bm25Results[0]?.score ?? 0,
       embeddingTopScore: args.embeddingResults[0]?.score ?? 0,
@@ -179,7 +259,11 @@ function guardedResult(args: {
         embeddingResults: args.embeddingResults,
         rankLimit: args.thresholds.sharedTopRankLimit,
       }),
-      metadataSupported: hasMetadataSupport(args.chunks, args.results),
+      metadataSupported: hasMetadataSupport({
+        chunks: args.chunks,
+        results: args.results,
+        capabilityIds: args.capabilityIds,
+      }),
     },
   };
 }
@@ -199,13 +283,23 @@ function hasSharedTopChunk(args: {
     .some((result) => bm25ChunkIds.has(result.chunk_id));
 }
 
-function hasMetadataSupport(
-  chunks: RepoMemoryChunk[],
-  results: MemoryRetrievalResult[],
-): boolean {
-  return results.some((result) => {
-    const chunk = chunks.find((item) => item.chunk_id === result.chunk_id);
-    return Boolean(chunk && chunk.related_capability_ids.length > 0);
+function hasMetadataSupport(args: {
+  chunks: RepoMemoryChunk[];
+  results: MemoryRetrievalResult[];
+  capabilityIds: string[];
+}): boolean {
+  const requestedCapabilities = new Set(args.capabilityIds);
+  return args.results.some((result) => {
+    const chunk = args.chunks.find((item) => item.chunk_id === result.chunk_id);
+    if (!chunk) {
+      return false;
+    }
+    if (requestedCapabilities.size === 0) {
+      return chunk.related_capability_ids.length > 0;
+    }
+    return chunk.related_capability_ids.some((capabilityId) =>
+      requestedCapabilities.has(capabilityId),
+    );
   });
 }
 

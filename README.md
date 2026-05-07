@@ -160,6 +160,7 @@ BM25: Recall@5=0.923, MRR=0.346, no-answer FPR=0.800
 Embedding: Recall@5=0.692, MRR=0.310, no-answer FPR=1.000
 RRF hybrid: Recall@5=0.923, MRR=0.390, no-answer FPR=1.000
 Guarded RRF hybrid: Recall@5=0.846, MRR=0.364, no-answer FPR=0.000, no-answer abstention=1.000
+Capability-aware guarded RRF hybrid: Recall@5=0.923, MRR=0.390, no-answer FPR=0.000, no-answer abstention=1.000
 ```
 
 BM25 is strong in this repo-memory corpus because many relevant documents
@@ -184,6 +185,15 @@ guarded RRF correctly abstains on all 5 no-answer queries and false-abstains on
 2 of 13 answerable queries (`false_abstention_rate=0.154`). The report lists
 those query examples and the thresholds used by the guard so future tuning can
 reduce recall loss without hiding no-answer failures.
+
+v0.2.4 calibrates abstention with Capability Graph metadata. For task-context
+queries tied to `api_apply_discount` and `route_checkout`, ReleaseGuard expands
+the retrieval query with deterministic capability aliases such as
+`invalid discount`, `checkout`, `cart total`, `critical flow`, `ADR`, and
+`incident`. This reduces the guarded retriever's false abstentions from `2` to
+`0` in the demo benchmark while keeping no-answer FPR at `0.000`. The expansion
+is retrieval-only; it does not alter the Capability Graph, Evidence Planner, or
+Decision Engine.
 
 Try guarded memory search:
 
@@ -219,6 +229,7 @@ v0.2 supports deterministic local repo-memory retrieval:
 - deterministic local embedding baseline,
 - Reciprocal Rank Fusion hybrid retrieval with `k=60`,
 - guarded RRF retrieval with deterministic abstention,
+- capability-aware guarded retrieval for graph-provided task context,
 - source trust tiers and current-PR document self-immunity hooks,
 - memory chunk citation validation,
 - deterministic retrieval eval dataset generation,

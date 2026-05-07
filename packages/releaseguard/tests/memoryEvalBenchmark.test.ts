@@ -46,6 +46,7 @@ describe("Repo Memory eval, benchmark, and demo reports", () => {
 
     expect(result.results.map((entry) => entry.retriever).sort()).toEqual([
       "bm25",
+      "capability_guarded_rrf_hybrid",
       "embedding",
       "guarded_rrf_hybrid",
       "rrf_hybrid",
@@ -64,8 +65,17 @@ describe("Repo Memory eval, benchmark, and demo reports", () => {
     const guarded = result.results.find(
       (entry) => entry.retriever === "guarded_rrf_hybrid",
     );
+    const capabilityGuarded = result.results.find(
+      (entry) => entry.retriever === "capability_guarded_rrf_hybrid",
+    );
     expect(guarded?.metrics.no_answer_abstention_rate).toBeGreaterThan(0);
     expect(guarded?.metrics.false_abstention_count).toBeGreaterThanOrEqual(0);
+    expect(capabilityGuarded?.metrics.no_answer_false_positive_rate).toBeLessThanOrEqual(
+      guarded?.metrics.no_answer_false_positive_rate ?? 1,
+    );
+    expect(capabilityGuarded?.metrics.false_abstention_count).toBeLessThanOrEqual(
+      guarded?.metrics.false_abstention_count ?? 0,
+    );
     expect(result.guarded_thresholds_used).toMatchObject({
       bm25MinTopScore: expect.any(Number),
       minQueryTokenOverlap: expect.any(Number),
@@ -94,6 +104,7 @@ describe("Repo Memory eval, benchmark, and demo reports", () => {
     expect(markdown).toContain("BM25 is strong in this repo-memory corpus");
     expect(markdown).toContain("deterministic embedding baseline is local");
     expect(markdown).toContain("Guarded RRF hybrid adds deterministic abstention");
+    expect(markdown).toContain("Capability-aware guarded RRF");
     expect(markdown).toContain(
       "No-answer handling is required before RAG context can safely influence evidence priority",
     );
@@ -102,6 +113,7 @@ describe("Repo Memory eval, benchmark, and demo reports", () => {
     expect(markdown).toContain("### Thresholds Used");
     expect(markdown).toContain("BM25 minimum top score");
     expect(markdown).toContain("RRF guard rule");
+    expect(markdown).toContain("Capability-aware expansion rule");
     expect(markdown).toContain("No-answer queries correctly abstained");
     expect(markdown).toContain("Answerable queries incorrectly abstained");
     expect(markdown).toContain("Citation Validation Eval");
@@ -119,6 +131,10 @@ describe("Repo Memory eval, benchmark, and demo reports", () => {
     expect(markdown).toContain("Checkout critical ADR");
     expect(markdown).toContain("Discount incident");
     expect(markdown).toContain("does not change PASS/WARN/BLOCK");
+    expect(markdown).toContain("Original query:");
+    expect(markdown).toContain("Expanded query terms:");
+    expect(markdown).toContain("Matched capability IDs:");
+    expect(markdown).toContain("Guarded retrieval decision:");
     expect(markdown).toContain("docs/adr/0007-checkout-critical-flow.md");
     expect(markdown).toContain("docs/incidents/2024-08-discount-crash.md");
   });

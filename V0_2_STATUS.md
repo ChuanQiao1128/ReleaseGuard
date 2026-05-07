@@ -404,7 +404,7 @@ Tests run:
 - `npm run releaseguard:selfcheck`
 - `npm run test --workspace @releaseguard/demo-app`
 
-Benchmark output so far:
+Benchmark output:
 - Chunks: 46
 - Queries: 18
 - No-answer queries: 5
@@ -484,3 +484,68 @@ Limitations:
 Next:
 - v0.3 may use trusted RAG context to raise evidence priority, but v0.2.3 stops
   before any RAG-informed evidence planning or merge decision changes.
+
+## v0.2.4 Capability-aware Retrieval Calibration
+
+Status: Done
+
+Done:
+- Added deterministic capability-aware query expansion for repo-memory
+  retrieval.
+- Expansion only uses known capability IDs and local aliases; no LLM calls are
+  made.
+- Guarded retrieval now uses expansion as a fallback path only when the
+  original guarded query would abstain.
+- Added `capability_guarded_rrf_hybrid` to the benchmark.
+- Updated the discount context demo report with:
+  - original query,
+  - expanded query terms,
+  - matched capability IDs,
+  - guarded retrieval decision and reason.
+- RAG remains report-only and does not affect Evidence Planner or
+  PASS/WARN/BLOCK decisions.
+
+Tests run:
+- `npm run test --workspace releaseguard -- memoryRetrievers.test.ts memoryEvalBenchmark.test.ts`
+- `npm run test --workspace releaseguard`
+- `npm run build --workspace releaseguard`
+- `npm run releaseguard -- memory index`
+- `npm run releaseguard -- memory benchmark`
+- `npm run releaseguard -- memory demo-discount-context`
+- `npm test`
+- `npm run build --workspace @releaseguard/demo-app`
+- `npm run releaseguard:selfcheck`
+- `npm run test --workspace @releaseguard/demo-app`
+
+Benchmark output so far:
+- Chunks: 46
+- Queries: 18
+- No-answer queries: 5
+- Guarded RRF hybrid:
+  - Recall@5 `0.846`
+  - MRR `0.364`
+  - no-answer FPR `0.000`
+  - no-answer abstention `1.000`
+  - false abstention count `2`
+  - false abstention rate `0.154`
+- Capability-aware guarded RRF hybrid:
+  - Recall@5 `0.923`
+  - MRR `0.390`
+  - no-answer FPR `0.000`
+  - no-answer abstention `1.000`
+  - false abstention count `0`
+  - false abstention rate `0.000`
+
+Before / after:
+- False abstention count: `2` -> `0`
+- No-answer FPR: `0.000` -> `0.000`
+
+Limitations:
+- Capability-aware retrieval uses graph-provided capability IDs as task
+  context. It does not discover structured dependencies.
+- The benchmark is still a small deterministic demo-corpus benchmark.
+- v0.2.4 does not add RAG-informed evidence priority.
+
+Next:
+- v0.3 may use trusted RAG context to raise evidence priority, but RAG must
+  still never lower requirements or decide PASS/WARN/BLOCK.

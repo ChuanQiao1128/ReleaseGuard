@@ -2,9 +2,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { scanRepository } from "../scanner/repoScanner";
 import { retrieveWithBm25 } from "./bm25Retriever";
-import { retrieveWithEmbeddings } from "./embeddingRetriever";
+import { guardedRetrieveWithRrf } from "./guardedRetriever";
 import { writeRepoMemoryIndex } from "./memoryIndex";
-import { fuseWithRrf } from "./rrfRetriever";
 import { RepoMemoryChunk } from "./types";
 
 export type RagDemoDiscountContextResult = {
@@ -16,22 +15,13 @@ export async function writeRagDemoDiscountContext(
   rootDir: string,
 ): Promise<RagDemoDiscountContextResult> {
   const index = await writeRepoMemoryIndex(rootDir);
-  const bm25Results = retrieveWithBm25({
+  const capabilityIds = ["api_apply_discount", "route_checkout"];
+  const guardedResult = await guardedRetrieveWithRrf({
     chunks: index.chunks,
     query: discountContextQuery(),
     filters: { source_type: ["adr", "incident"] },
-    limit: 10,
-  });
-  const embeddingResults = await retrieveWithEmbeddings({
-    chunks: index.chunks,
-    query: discountContextQuery(),
-    filters: { source_type: ["adr", "incident"] },
-    limit: 10,
-  });
-  const hybridResults = fuseWithRrf({
-    bm25Results,
-    embeddingResults,
     limit: 5,
+    capabilityIds,
   });
   const incidentResults = retrieveWithBm25({
     chunks: index.chunks,
@@ -46,7 +36,7 @@ export async function writeRagDemoDiscountContext(
     limit: 3,
   });
   const retrievedChunkIds = uniqueChunkIds([
-    ...hybridResults.map((result) => result.chunk_id),
+    ...guardedResult.results.map((result) => result.chunk_id),
     ...incidentResults.map((result) => result.chunk_id),
     ...checkoutAdrResults.map((result) => result.chunk_id),
   ]).slice(0, 10);
@@ -70,6 +60,12 @@ export async function writeRagDemoDiscountContext(
       chunks: index.chunks,
       graphCapabilities,
       retrievedChunkIds,
+      originalQuery: discountContextQuery(),
+      expansionTerms: guardedResult.query_expansion?.expansion_terms ?? [],
+      matchedCapabilityIds:
+        guardedResult.query_expansion?.matched_capability_ids ?? capabilityIds,
+      guardedDecision: guardedResult.decision,
+      guardedReason: guardedResult.reason,
     }),
   );
   return {
@@ -83,6 +79,11 @@ function renderDiscountContextReport(args: {
   chunks: RepoMemoryChunk[];
   graphCapabilities: string[];
   retrievedChunkIds: string[];
+  originalQuery: string;
+  expansionTerms: string[];
+  matchedCapabilityIds: string[];
+  guardedDecision: string;
+  guardedReason: string;
 }): string {
   const chunksById = new Map(args.chunks.map((chunk) => [chunk.chunk_id, chunk]));
   const retrievedChunks = args.retrievedChunkIds
@@ -99,6 +100,12 @@ function renderDiscountContextReport(args: {
     ...args.graphCapabilities.map((capability) => `- ${capability}`),
     "",
     "## RAG retrieved repo memory",
+    "",
+    `Original query: ${args.originalQuery}`,
+    `Matched capability IDs: ${args.matchedCapabilityIds.join(", ") || "none"}`,
+    `Expanded query terms: ${args.expansionTerms.join(", ") || "none"}`,
+    `Guarded retrieval decision: ${args.guardedDecision}`,
+    `Guarded retrieval reason: ${args.guardedReason}`,
     "",
     ...retrievedChunks.map(
       (chunk, index) =>

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { retrieveWithBm25 } from "../src/memory/bm25Retriever";
+import { expandQueryWithCapabilities } from "../src/memory/capabilityQueryExpansion";
 import {
   DeterministicLocalEmbeddingProvider,
   cosineSimilarity,
@@ -200,6 +201,57 @@ describe("Repo Memory retrievers", () => {
       .map((chunk) => chunk?.file_path ?? "");
 
     expect(result.decision).toBe("HAS_RELEVANT_CONTEXT");
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/discount-crash|checkout-critical-flow/),
+      ]),
+    );
+  });
+
+  it("capability query expansion adds discount and checkout aliases", () => {
+    const expansion = expandQueryWithCapabilities({
+      query: "historical checkout risk after invalid discount validation changes",
+      capabilityIds: ["api_apply_discount", "route_checkout", "unknown_capability"],
+    });
+
+    expect(expansion.matched_capability_ids).toEqual([
+      "api_apply_discount",
+      "route_checkout",
+    ]);
+    expect(expansion.expansion_terms).toEqual(
+      expect.arrayContaining([
+        "api_apply_discount",
+        "route_checkout",
+        "invalid discount",
+        "checkout",
+        "cart total",
+        "critical flow",
+        "ADR",
+        "incident",
+      ]),
+    );
+    expect(expansion.expanded_query).toContain("api_apply_discount");
+  });
+
+  it("capability-aware guarded retrieval accepts historical discount checkout context", async () => {
+    const { chunks } = await writeRepoMemoryIndex(repoRoot);
+
+    const result = await guardedRetrieveWithRrf({
+      chunks,
+      query: "historical checkout risk after invalid discount validation changes",
+      capabilityIds: ["api_apply_discount", "route_checkout"],
+      limit: 5,
+    });
+    const paths = result.results
+      .map((item) => chunks.find((chunk) => chunk.chunk_id === item.chunk_id))
+      .map((chunk) => chunk?.file_path ?? "");
+
+    expect(result.decision).toBe("HAS_RELEVANT_CONTEXT");
+    expect(result.retriever).toBe("capability_guarded_rrf_hybrid");
+    expect(result.query_expansion?.matched_capability_ids).toEqual([
+      "api_apply_discount",
+      "route_checkout",
+    ]);
     expect(paths).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/discount-crash|checkout-critical-flow/),
