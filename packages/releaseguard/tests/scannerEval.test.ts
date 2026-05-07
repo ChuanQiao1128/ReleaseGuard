@@ -61,7 +61,7 @@ describe("scanner eval", () => {
       };
     };
 
-    expect(result.coverage_file_count).toBe(2);
+    expect(result.coverage_file_count).toBe(3);
     expect(result.coverage_matched_file_count).toBeGreaterThanOrEqual(2);
     expect(result.resolution_level_distribution.L4_TEST_EVIDENCE_MAPPED).toBeGreaterThan(
       0,

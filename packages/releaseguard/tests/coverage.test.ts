@@ -25,8 +25,8 @@ describe("coverage ingestion", () => {
     });
 
     expect(report.provider).toBe("lcov");
-    expect(report.file_count).toBe(2);
-    expect(report.covered_file_count).toBe(2);
+    expect(report.file_count).toBe(3);
+    expect(report.covered_file_count).toBe(3);
     expect(report.records).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -35,6 +35,12 @@ describe("coverage ingestion", () => {
           covered_lines: [1, 2, 3, 4],
           uncovered_lines: [5],
           line_coverage_percent: 80,
+        }),
+        expect.objectContaining({
+          normalized_file_path: "apps/demo-app/src/lib/unknown-helper.ts",
+          covered_lines: [1, 2],
+          uncovered_lines: [3],
+          line_coverage_percent: 66.67,
         }),
       ]),
     );

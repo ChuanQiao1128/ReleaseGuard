@@ -402,6 +402,19 @@ Use coverage in run mode:
 npm run releaseguard -- run --base main --head HEAD --coverage coverage/lcov.info
 ```
 
+Run the supplemental coverage demo:
+
+```bash
+npm run releaseguard -- run --fixture demo-coverage-supplemental-evidence --coverage packages/releaseguard/fixtures/coverage/lcov.info
+# Decision: WARN
+# Reason: source change could not be mapped to known capability.
+```
+
+The fixture simulates an unmapped source change. ReleaseGuard still fails safe
+with `WARN`, but the report includes file-level coverage evidence so reviewers
+can see that the changed file is exercised by tests even though no precise
+business capability or case-level evidence was proven.
+
 Coverage evidence is supplemental. It is weaker than declared case evidence and
 direct test mapping:
 

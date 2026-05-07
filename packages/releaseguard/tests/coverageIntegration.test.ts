@@ -8,7 +8,7 @@ import { ChangeScope } from "../src/diff/diffParser";
 import { applyDemoMissingEvidenceFixture } from "../src/fixtures/regressionFixture";
 import { scanRepository } from "../src/scanner/repoScanner";
 import { ingestCoverageFile } from "../src/coverage/coverageIngest";
-import { runReleaseGuardWithScope } from "../src/run";
+import { runReleaseGuard, runReleaseGuardWithScope } from "../src/run";
 
 const repoRoot = path.resolve(process.cwd(), "../..");
 
@@ -84,6 +84,35 @@ describe("coverage evidence integration", () => {
     expect(report).toContain("packages/releaseguard/src/coverage/lcovParser.ts");
     expect(report).toContain("does not prove the specific business case");
   });
+
+  it("demo-coverage-supplemental-evidence outputs WARN with coverage context", async () => {
+    const result = await runReleaseGuard({
+      rootDir: repoRoot,
+      fixture: "demo-coverage-supplemental-evidence",
+      coverageFile: "packages/releaseguard/fixtures/coverage/lcov.info",
+    });
+    const report = await fs.readFile(result.reportPath, "utf8");
+
+    expect(result.decision).toEqual({
+      decision: "WARN",
+      reason: "source change could not be mapped to known capability.",
+    });
+    expect(result.impact.affected_capability_ids).toHaveLength(0);
+    expect(result.executionResult.results).toHaveLength(0);
+    expect(result.evidencePlan.coverageEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          file_path: "apps/demo-app/src/lib/unknown-helper.ts",
+          evidence_type: "coverage_file_evidence",
+          line_coverage_percent: 66.67,
+        }),
+      ]),
+    );
+    expect(report).toContain("Fixture: demo-coverage-supplemental-evidence");
+    expect(report).toContain("apps/demo-app/src/lib/unknown-helper.ts");
+    expect(report).toContain("66.67% line coverage");
+    expect(report).toContain("does not prove the specific business case");
+  });
 });
 
 function makeGitScope(changedFiles: string[]): ChangeScope {
@@ -101,4 +130,3 @@ function makeGitScope(changedFiles: string[]): ChangeScope {
     docsOnly: scope.classification === "docs_only",
   };
 }
-

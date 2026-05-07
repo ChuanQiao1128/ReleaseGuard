@@ -7,7 +7,8 @@ export type ChangeScope =
       fixture:
         | "demo-discount-regression"
         | "demo-missing-evidence"
-        | "demo-rag-elevated-evidence";
+        | "demo-rag-elevated-evidence"
+        | "demo-coverage-supplemental-evidence";
       changedFiles: string[];
       scope: ScopeAnalysis;
       docsOnly: false;
@@ -40,14 +41,12 @@ export async function resolveChangeScope(args: {
       args.fixture !== "demo-discount-regression" &&
       args.fixture !== "demo-missing-evidence" &&
       args.fixture !== "demo-rag-elevated-evidence" &&
+      args.fixture !== "demo-coverage-supplemental-evidence" &&
       args.fixture !== "demo-docs-only"
     ) {
       throw new Error(`Unknown fixture: ${args.fixture}`);
     }
-    const changedFiles =
-      args.fixture === "demo-docs-only"
-        ? ["README.md"]
-        : ["apps/demo-app/src/app/api/discount/apply/route.ts"];
+    const changedFiles = fixtureChangedFiles(args.fixture);
     const scope = analyzeScope(changedFiles);
     if (args.fixture === "demo-docs-only") {
       return {
@@ -89,4 +88,14 @@ export async function resolveChangeScope(args: {
     scope,
     docsOnly: scope.classification === "docs_only",
   };
+}
+
+function fixtureChangedFiles(fixture: string): string[] {
+  if (fixture === "demo-docs-only") {
+    return ["README.md"];
+  }
+  if (fixture === "demo-coverage-supplemental-evidence") {
+    return ["apps/demo-app/src/lib/unknown-helper.ts"];
+  }
+  return ["apps/demo-app/src/app/api/discount/apply/route.ts"];
 }

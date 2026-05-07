@@ -347,6 +347,7 @@ function usage(): string {
     "  releaseguard run --fixture demo-missing-evidence",
     "  releaseguard run --fixture demo-docs-only",
     "  releaseguard run --fixture demo-rag-elevated-evidence",
+    "  releaseguard run --fixture demo-coverage-supplemental-evidence --coverage <coverage_file>",
     "  releaseguard run --fixture demo-docs-only --expect-decision PASS",
     "  releaseguard memory index",
     "  releaseguard memory benchmark",

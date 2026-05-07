@@ -53,6 +53,38 @@ dashboard.
   - run mode with coverage,
   - invalid_discount still missing when only coverage evidence exists.
 
+## v0.6.1 Coverage Supplemental Evidence Demo
+
+Done:
+
+- Added fixture:
+  - `demo-coverage-supplemental-evidence`
+- The fixture simulates:
+  - changed source file: `apps/demo-app/src/lib/unknown-helper.ts`
+  - no route/API capability mapping,
+  - LCOV file-level coverage evidence,
+  - no case-level evidence.
+- Updated LCOV fixture to include the supplemental demo file.
+- Added tests proving:
+  - the fixture outputs `WARN`,
+  - coverage evidence appears in the report,
+  - coverage limitation text appears in the report,
+  - coverage does not satisfy `invalid_discount` case-level evidence,
+  - unknown source with coverage does not `PASS`.
+
+Demo command:
+
+```bash
+npm run releaseguard -- run --fixture demo-coverage-supplemental-evidence --coverage packages/releaseguard/fixtures/coverage/lcov.info
+```
+
+Expected output:
+
+```text
+Decision: WARN
+Reason: source change could not be mapped to known capability.
+```
+
 ## Evidence Semantics
 
 Coverage evidence is file/line/suite-level evidence. It can show that tests
@@ -92,6 +124,7 @@ npm run releaseguard -- run --fixture demo-discount-regression
 npm run releaseguard -- run --fixture demo-missing-evidence
 npm run releaseguard -- run --fixture demo-docs-only
 npm run releaseguard -- run --fixture demo-rag-elevated-evidence
+npm run releaseguard -- run --fixture demo-coverage-supplemental-evidence --coverage packages/releaseguard/fixtures/coverage/lcov.info
 npm test
 npm run build --workspace @releaseguard/demo-app
 npm run releaseguard:selfcheck
@@ -113,8 +146,8 @@ Final verification result: passed.
 
 ## Next
 
-Merge/tag v0.6 after review if desired.
+v0.6 has been merged/tagged as `releaseguard-v0.6`.
 
-Likely next implementation after v0.6: coverage-backed real repo eval refresh
+Likely next implementation after v0.6.1: coverage-backed real repo eval refresh
 or additional coverage providers. Playwright should remain after enough route
 and evidence targeting data exists.

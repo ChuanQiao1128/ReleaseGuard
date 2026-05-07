@@ -26,6 +26,22 @@ describe("parseCliArgs", () => {
     });
   });
 
+  it("parses coverage supplemental fixture run arguments", () => {
+    expect(
+      parseCliArgs([
+        "run",
+        "--fixture",
+        "demo-coverage-supplemental-evidence",
+        "--coverage",
+        "packages/releaseguard/fixtures/coverage/lcov.info",
+      ]),
+    ).toEqual({
+      command: "run",
+      fixture: "demo-coverage-supplemental-evidence",
+      coverageFile: "packages/releaseguard/fixtures/coverage/lcov.info",
+    });
+  });
+
   it("parses expected decision checks", () => {
     expect(
       parseCliArgs([
