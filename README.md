@@ -2,6 +2,8 @@
 
 **Know what your AI just changed — before you push.**
 
+> **Latest — v0.7.7**: Vite + React Router scanner with route → API import graph traversal, plus an *evidence floor* rule that stops zero-test projects from getting misleading `PASS` on every change. Validated on a production Vite + React 19 + React Router 7 SaaS frontend: scanner went from 100% unresolved → **7.8% unresolved**, evidence floor surfaces 15 affected capabilities on a single API-wrapper change. [See change log](docs/VERSIONS.md).
+
 AI assistants generate pull requests faster than reviewers can read them. The integration tests you have were written for last quarter's code. CI says green. Then `/checkout` breaks in production.
 
 ReleaseGuard sits between `git push` and `merge` and answers three questions your test runner cannot:
@@ -86,10 +88,10 @@ Two options today, with a third coming after the npm release.
 npm run build --workspace releaseguard
 cd packages/releaseguard
 npm pack
-# → produces releaseguard-0.7.3.tgz
+# → produces releaseguard-0.7.7.tgz
 
 # In your project
-npm install --save-dev /path/to/releaseguard-0.7.3.tgz
+npm install --save-dev /path/to/releaseguard-0.7.7.tgz
 npx releaseguard scanner eval --repo-root .
 npx releaseguard run --repo-root . --base main --head HEAD
 ```
@@ -121,9 +123,12 @@ This is a preview. The CLI works end-to-end and is dogfooded against itself in C
 |---|---|
 | CLI: `run`, `scanner eval`, `coverage ingest`, `memory` | Working |
 | `PASS` / `WARN` / `BLOCK` decision engine | Working, deterministic |
-| Capability graph scanner | Next.js App Router + TypeScript supported; universal fallback for everything else |
+| Next.js App Router + TypeScript scanner | Working — file routes, route handlers, fetch literals, endpoint constants, fetcher/SWR wrappers |
+| Vite + React Router scanner | Working — JSX `<Route>`, `createBrowserRouter` / `useRoutes`, axios direct + `axios.create()` clients (cross-file), TanStack Query `queryFn`, route → API import graph |
+| Universal fallback (any framework) | Working — file/module/package fail-safe `WARN` for unmapped source |
 | Coverage ingestion | LCOV and Cobertura |
-| Repo memory (RAG over ADRs, incidents, reports) | Working, report-only and evidence-priority modes |
+| Repo memory (RAG: BM25 + embeddings + RRF + abstention) | Working, report-only and evidence-priority modes |
+| Evidence floor (no-test capabilities → `WARN`) | Working — added v0.7.7 |
 | Markdown + HTML reports | Working |
 | GitHub Actions template | Available, advisory-only |
 | Published npm package | Not yet |
@@ -131,7 +136,9 @@ This is a preview. The CLI works end-to-end and is dogfooded against itself in C
 | GitHub App with PR comments and check enforcement | Not yet |
 | Team dashboard | Not yet |
 
-If your repo is not Next.js + TypeScript, the universal fallback still gives a fail-safe `WARN` for unmapped source changes — it will not silently `PASS`. See [docs/scanner_eval/summary.md](docs/scanner_eval/summary.md) for what the scanner has been measured to handle on real repos.
+**Real-world validation.** Tested on a production Vite + React 19 + React Router 7 + axios + TanStack Query SaaS frontend (recallsmith). Starting from `unsupported_framework` 100% unresolved, the v0.7.x adapter pulled it to 10 routes / 8 outbound APIs / **71 resolved callsites / 7.8% unresolved rate**. The evidence floor correctly identifies that all 15 affected capabilities on a single API-wrapper change have **zero verification infrastructure** (no tests, no coverage, no declarations) and surfaces this to reviewers instead of returning a misleading `PASS`.
+
+If your repo is not Next.js or Vite + React Router, the universal fallback still gives a fail-safe `WARN` for unmapped source changes — it will not silently `PASS`. See [docs/scanner_eval/summary.md](docs/scanner_eval/summary.md) for what the scanner has been measured to handle on real OSS repos.
 
 ## How it works
 
@@ -155,7 +162,7 @@ For the full design rationale, anti-patterns, and what RAG is *not* allowed to d
 ├── packages/releaseguard/          # The CLI and core engine
 │   ├── src/                        # Scanner, evidence planner, decision, RAG, reports
 │   ├── fixtures/                   # Demo PRs for BLOCK / WARN / PASS
-│   └── tests/                      # Vitest suite (23 files)
+│   └── tests/                      # Vitest suite — 90+ tests across scanner, decision, evidence, RAG
 ├── docs/
 │   ├── sample_reports/             # Example reports for each decision class
 │   ├── scanner_eval/               # Scanner accuracy measurements on real repos
