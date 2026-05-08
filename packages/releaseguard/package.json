@@ -1,7 +1,7 @@
 {
   "name": "releaseguard",
   "private": true,
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "PR-aware merge impact coverage gate.",
   "license": "UNLICENSED",
   "bin": {

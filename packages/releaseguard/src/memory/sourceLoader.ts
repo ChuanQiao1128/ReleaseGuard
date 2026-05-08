@@ -10,6 +10,7 @@ const IGNORED_DIR_NAMES = new Set([
   "coverage",
   "dist",
   "node_modules",
+  "sample_reports",
   "scanner_eval",
 ]);
 

@@ -18,7 +18,7 @@ npm pack
 Install the generated tarball in another repository:
 
 ```bash
-npm install --save-dev /path/to/releaseguard-0.7.2.tgz
+npm install --save-dev /path/to/releaseguard-0.7.3.tgz
 npx releaseguard scanner eval --repo-root .
 ```
 

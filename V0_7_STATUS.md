@@ -45,7 +45,7 @@ npm pack
 Install in another repository:
 
 ```bash
-npm install --save-dev /path/to/releaseguard-0.7.2.tgz
+npm install --save-dev /path/to/releaseguard-0.7.3.tgz
 npx releaseguard scanner eval --repo-root .
 ```
 
@@ -82,6 +82,33 @@ Limits:
 - It does not add PR comments, GitHub App behavior, or hosted UI.
 - It does not change `PASS` / `WARN` / `BLOCK` semantics.
 
+## v0.7.3 Sample Report Gallery
+
+Done:
+
+- Added curated sample reports under:
+  - `docs/sample_reports/`
+- Added samples for:
+  - `demo-discount-regression`
+  - `demo-missing-evidence`
+  - `demo-docs-only`
+  - `demo-rag-elevated-evidence`
+  - `demo-coverage-supplemental-evidence`
+- Added `scripts/generate_sample_reports.sh` to regenerate the gallery from
+  current fixture output.
+- Sanitized run artifact IDs and test durations in committed samples.
+- Excluded `docs/sample_reports` from Repo Memory indexing so showcase artifacts
+  do not pollute RAG benchmark corpus.
+- Linked the sample gallery from the root README.
+- Updated package metadata for the local tarball:
+  - `releaseguard-0.7.3.tgz`
+
+Limits:
+
+- The gallery contains static examples, not live run artifacts.
+- Raw `artifacts/releaseguard` directories remain ignored.
+- v0.7.3 does not add new product behavior or alter decision semantics.
+
 ## Limits
 
 - v0.7 does not publish to npm.
@@ -97,6 +124,7 @@ Limits:
 ```bash
 npm run test --workspace releaseguard -- cli.test.ts
 npm run test --workspace releaseguard -- cli.test.ts memory.test.ts
+npm run test --workspace releaseguard -- memory.test.ts
 npm run test --workspace releaseguard
 npm run build --workspace releaseguard
 npm run releaseguard -- scanner eval --root .
@@ -111,6 +139,7 @@ npm run releaseguard:selfcheck
 npm test
 npm run build --workspace @releaseguard/demo-app
 npm run test --workspace @releaseguard/demo-app
+./scripts/generate_sample_reports.sh
 cd packages/releaseguard && npm pack
 ./scripts/external_smoke_test.sh
 ./scripts/verify_releaseguard.sh
@@ -121,7 +150,7 @@ Final verification result: passed.
 Package output:
 
 ```text
-releaseguard-0.7.2.tgz
+releaseguard-0.7.3.tgz
 ```
 
 External smoke result:

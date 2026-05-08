@@ -92,6 +92,14 @@ artifacts/releaseguard/<run_id>/report.html
 
 The Markdown report is optimized for CLI and GitHub Actions artifacts. The HTML report is a static file with the same merge-safety content: decision, changed files, affected capabilities, selected evidence, missing evidence, historical risk context, coverage evidence, scanner coverage, and artifact links. It is not a dashboard and does not change `PASS` / `WARN` / `BLOCK` semantics.
 
+Sample reports are committed under [docs/sample_reports](docs/sample_reports/README.md):
+
+- [BLOCK: discount regression](docs/sample_reports/block-discount-regression/report.md)
+- [WARN: missing evidence](docs/sample_reports/warn-missing-evidence/report.md)
+- [PASS: docs-only](docs/sample_reports/pass-docs-only/report.md)
+- [WARN: RAG-elevated evidence](docs/sample_reports/warn-rag-elevated-evidence/report.md)
+- [WARN: coverage supplemental evidence](docs/sample_reports/warn-coverage-supplemental/report.md)
+
 ## v0.1 support
 
 ReleaseGuard v0.1 is a narrow vertical slice for the demo app only.
@@ -467,7 +475,7 @@ npm pack
 Install the tarball in another repository:
 
 ```bash
-npm install --save-dev /path/to/releaseguard-0.7.2.tgz
+npm install --save-dev /path/to/releaseguard-0.7.3.tgz
 npx releaseguard scanner eval --repo-root .
 ```
 

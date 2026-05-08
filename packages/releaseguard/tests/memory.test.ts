@@ -107,6 +107,20 @@ describe("repo memory loader and chunker", () => {
     expect(chunks.map((chunk) => chunk.file_path)).toEqual(["docs/keep.md"]);
   });
 
+  it("ignores sample report gallery artifacts when loading repo memory", async () => {
+    const rootDir = await tempRepo();
+    await writeFile(rootDir, "docs/keep.md", "# Keep\n\nUseful text.\n");
+    await writeFile(
+      rootDir,
+      "docs/sample_reports/block-discount-regression/report.md",
+      "# ReleaseGuard Report\n\nDecision: BLOCK\n",
+    );
+
+    const chunks = await loadRepoMemoryChunks(rootDir);
+
+    expect(chunks.map((chunk) => chunk.file_path)).toEqual(["docs/keep.md"]);
+  });
+
   it("ignores external quickstart docs when loading repo memory", async () => {
     const rootDir = await tempRepo();
     await writeFile(rootDir, "docs/keep.md", "# Keep\n\nUseful text.\n");

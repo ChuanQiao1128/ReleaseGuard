@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ReleaseGuard Report - WARN</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --text: #17202a;
+      --muted: #596675;
+      --line: #d9dee5;
+      --pass: #137333;
+      --warn: #b06000;
+      --block: #b3261e;
+      --code: #eef2f6;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 28px;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    .decision {
+      border-left: 6px solid var(--muted);
+      background: var(--panel);
+      padding: 18px 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+    }
+    .decision.pass { border-left-color: var(--pass); }
+    .decision.warn { border-left-color: var(--warn); }
+    .decision.block { border-left-color: var(--block); }
+    .decision strong {
+      display: block;
+      font-size: 22px;
+      margin-bottom: 6px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+    li + li {
+      margin-top: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+    code {
+      background: var(--code);
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+    .muted {
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>ReleaseGuard Report</h1>
+    <section class="decision warn">
+      <strong>Decision: WARN</strong>
+      <div>trusted repo memory raised evidence requirement, but required browser evidence is missing.</div>
+    </section>
+    <div class="grid">
+      <section>
+      <h2>Changed files</h2>
+      <p class="muted">Fixture: demo-rag-elevated-evidence</p>
+<ul><li><code>apps/demo-app/src/app/api/discount/apply/route.ts</code></li></ul>
+    </section>
+      <section>
+      <h2>Affected capabilities</h2>
+      <table>
+      <thead><tr><th>ID</th><th>Target</th><th>Type</th><th>Risk</th></tr></thead>
+      <tbody>
+        <tr><td><code>api_apply_discount</code></td><td>POST /api/discount/apply</td><td>api</td><td>high</td></tr>
+<tr><td><code>route_checkout</code></td><td>/checkout</td><td>route</td><td>high</td></tr>
+      </tbody>
+    </table>
+    </section>
+    </div>
+    <section>
+      <h2>Selected evidence</h2>
+      <table>
+      <thead><tr><th>Test</th><th>File</th><th>Capability</th><th>Tags</th></tr></thead>
+      <tbody>
+        <tr><td><code>test_api_discount_invalid</code></td><td><code>tests/api/discount.test.ts</code></td><td><code>api_apply_discount</code></td><td>invalid_discount, error_status, 400</td></tr>
+      </tbody>
+    </table>
+    </section>
+    <section>
+      <h2>Historical risk context</h2>
+      <ul><li><code>hrc_4e89e7de4c34</code>: accepted require_browser_smoke for api_apply_discount, route_checkout (mem_4fbd4a8a435e3d40, mem_505ba72c90a1ec12, mem_6b6bc232b387ee67, mem_7daf07a17369b434, mem_ae47dc886f688e0f, mem_bece124ffd4a4e4e, mem_e5634b3427122d62, mem_e8d5320e221a7a49) - Trusted repo memory retrieved ADR 0007: Checkout Critical Flow; 2024-08 Discount Validation Crash and links checkout critical-flow policy with historical discount validation failures.</li></ul>
+    </section>
+    <section>
+      <h2>Missing evidence</h2>
+      <ul><li><code>route_checkout</code>: trusted repo memory raised evidence requirement, but required browser evidence is missing. (browser_smoke target=/checkout source_context=hrc_4e89e7de4c34)</li></ul>
+    </section>
+    <section>
+      <h2>Coverage evidence</h2>
+      <p>No coverage report provided.</p>
+    </section>
+    <section>
+      <h2>Test results</h2>
+      <table>
+      <thead><tr><th>Test file</th><th>Outcome</th><th>Exit code</th><th>Duration</th></tr></thead>
+      <tbody>
+        <tr><td><code>tests/api/discount.test.ts</code></td><td>PASSED</td><td>0</td><td>&lt;duration&gt;ms</td></tr>
+      </tbody>
+    </table>
+    </section>
+    <section>
+      <h2>Scanner coverage</h2>
+      <ul><li>Capability graph: <code>.releaseguard/capability_graph.json</code></li><li>Coverage report: <code>.releaseguard/coverage_report.md</code></li></ul>
+    </section>
+    <section>
+      <h2>Artifacts</h2>
+      <ul><li>Markdown report: <code>artifacts/releaseguard/RUN_ID/report.md</code></li><li>HTML report: <code>artifacts/releaseguard/RUN_ID/report.html</code></li><li>Evidence result: <code>artifacts/releaseguard/RUN_ID/evidence_result.json</code></li><li>Test results: <code>artifacts/releaseguard/RUN_ID/test_results.json</code></li></ul>
+    </section>
+  </main>
+</body>
+</html>
