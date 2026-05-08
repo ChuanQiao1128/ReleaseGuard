@@ -1,6 +1,7 @@
 {
   "name": "releaseguard",
   "private": true,
+  "license": "MIT",
   "workspaces": [
     "apps/demo-app",
     "packages/releaseguard"

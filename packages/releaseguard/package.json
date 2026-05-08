@@ -2,8 +2,17 @@
   "name": "releaseguard",
   "private": true,
   "version": "0.7.3",
-  "description": "PR-aware merge impact coverage gate.",
-  "license": "UNLICENSED",
+  "description": "PR-aware merge impact coverage gate. Tells you whether the thing your PR actually changed was tested.",
+  "license": "MIT",
+  "keywords": [
+    "ci",
+    "pull-request",
+    "merge",
+    "code-review",
+    "test-coverage",
+    "ai-coding",
+    "github-actions"
+  ],
   "bin": {
     "releaseguard": "dist/cli.js"
   },
