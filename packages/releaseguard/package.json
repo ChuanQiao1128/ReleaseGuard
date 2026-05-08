@@ -1,7 +1,7 @@
 {
   "name": "releaseguard",
   "private": true,
-  "version": "0.7.6",
+  "version": "0.7.7",
   "description": "PR-aware merge impact coverage gate. Tells you whether the thing your PR actually changed was tested.",
   "license": "MIT",
   "keywords": [

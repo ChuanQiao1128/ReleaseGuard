@@ -14,6 +14,7 @@ import { scanPackageManifests } from "./packageManifestScanner";
 import { scanUniversalFiles } from "./universalFileScanner";
 import { scanViteReactRouterRoutes } from "./viteReactRouterRouteScanner";
 import { scanAxiosCallsites } from "./axiosCallsiteScanner";
+import { buildViteRouteToApiEdges } from "./viteRouteImportGraph";
 
 export async function scanRepository(rootDir: string): Promise<{
   graph: CapabilityGraph;
@@ -73,11 +74,23 @@ export async function scanRepository(rootDir: string): Promise<{
       ]),
     ].sort();
 
-    await scanViteReactRouterRoutes(rootDir, framework.appRoot, graph, coverage);
+    const viteRoutes = await scanViteReactRouterRoutes(
+      rootDir,
+      framework.appRoot,
+      graph,
+      coverage,
+    );
     await scanAxiosCallsites(rootDir, framework.appRoot, graph, coverage);
     await scanTests(rootDir, framework.appRoot, graph);
+    await buildViteRouteToApiEdges({
+      rootDir,
+      appRoot: framework.appRoot,
+      routes: viteRoutes,
+      graph,
+      coverage,
+    });
     coverage.limitations.push(
-      "Vite + React Router adapter v1 resolves JSX <Route>, createBrowserRouter / useRoutes object routes, and axios calls with literal URLs. Path nesting, route grouping, dynamic clients, and non-literal URLs are unresolved.",
+      "Vite + React Router adapter v1 resolves JSX <Route>, createBrowserRouter / useRoutes object routes, axios calls with literal URLs, and route -> api edges via local import graph traversal. Path aliases, dynamic clients, non-literal URLs, and non-relative imports are unresolved.",
     );
   } else {
     coverage.limitations.push(

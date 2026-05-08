@@ -185,6 +185,7 @@ export async function runReleaseGuardWithScope(options: {
       graph,
       evidencePlan,
       executionResult,
+      affectedCapabilityIds: impact.affected_capability_ids,
       docsOnly: scope.docsOnly,
       unmappedSourceChange,
       unresolvedImpactReason: impactResolution.failSafeWarn
